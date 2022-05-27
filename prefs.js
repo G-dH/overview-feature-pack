@@ -553,6 +553,15 @@ function _getGeneralOptionList() {
         )
     );
 
+    optionList.push(
+        _optionsItem(
+            _('Fullscreen Hot Corner'),
+            _('Allows hot corner in fullscreen mode.'),
+            _newSwitch(),
+            'fullscreenHotCorner'
+        )
+    );
+
     //-----------------------------------------------------
     optionList.push(
         _optionsItem(
@@ -581,7 +590,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Scroll Switches App Windows Workspaces'),
-            "Scrolling over an app icon will switch to the next workspace that contains the app window. If the previous option is enabled, the opacity of other application's window previews will be reduced.",
+            "Scrolling over an app icon will move the overview to the next workspace that contains the app window. If the previous option is enabled, the opacity of other app window previews will be reduced to highlight windows of the app.",
             _newSwitch(),
             'dashScrollSwitchesAppWindowsWs'
         )
@@ -592,7 +601,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Show Windows Before Activation'),
-            'If the clicked app has more than one window and [no window / recently used window] (depends on the following option) is on the current workspace, only move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.',
+            'if the app you clicked on has more than one window and [no window / recently used window] (depends on the following option) is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.',
             showWindowsBeforeBtn,
             'dashShowWindowsBeforeActivation'
         )
@@ -616,7 +625,7 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('App Icon Context Menu Items'),
+            _('App Icon Menu Items'),
         )
     );
 

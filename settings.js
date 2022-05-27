@@ -31,6 +31,7 @@ var Options = class Options {
             hoverActivatesWindowOnLeave: ['boolean', 'hover-activates-window-on-leave'],
             appMenuMoveAppToWs: ['boolean', 'app-menu-move-app-to-ws'],
             appMenuForceQuit:['boolean', 'app-menu-force-quit'],
+            fullscreenHotCorner: ['boolean', 'fullscreen-hot-corner']
         }
     }
 

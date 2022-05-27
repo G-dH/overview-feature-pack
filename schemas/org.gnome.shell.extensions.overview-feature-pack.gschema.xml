@@ -14,13 +14,16 @@
     <key type="b" name="dash-scroll-switches-app-windows-ws">
       <default>true</default>
     </key>
+    <key type="b" name="dash-shift-click-moves-app-to-current-ws">
+      <default>true</default>
+    </key>
     <key type="b" name="space-activates-dash">
       <default>true</default>
     </key>
     <key type="b" name="move-titles-into-windows">
       <default>true</default>
     </key>
-    <key type="b" name="dash-shift-click-moves-app-to-current-ws">
+    <key type="b" name="fullscreen-hot-corner">
       <default>true</default>
     </key>
     <key type="b" name="add-reorder-ws">

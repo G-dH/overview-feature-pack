@@ -6,6 +6,7 @@ const { Clutter, Gio, GLib, GObject, Meta, Shell, St } = imports.gi;
 const { AppMenu } = imports.ui.appMenu;
 const PopupMenu = imports.ui.popupMenu;
 const BoxPointer = imports.ui.boxpointer;
+const Layout = imports.ui.layout;
 const Main = imports.ui.main;
 
 const AppDisplay = imports.ui.appDisplay;
@@ -38,6 +39,8 @@ function activate() {
 
     _featurePackOverrides['WorkspacesDisplay'] = _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, WorkspacesDisplayOverride);
     _featurePackOverrides['AppIcon'] = _Util.overrideProto(AppDisplay.AppIcon.prototype, AppIconOverride);
+    _featurePackOverrides['HotCorner'] = _Util.overrideProto(Layout.HotCorner.prototype, HotCornerOverride);
+    Main.layoutManager._updateHotCorners();
     _injectAppIcon();
     _injectWindowPreview();
     _updateDash();
@@ -64,6 +67,7 @@ function reset() {
 
     _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
     _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, _featurePackOverrides['WorkspacesDisplay']);
+    _Util.overrideProto(Layout.HotCorner.prototype, _featurePackOverrides['HotCorner']);
     _featurePackOverrides = {};
 
     const removeConnections = true;
@@ -377,6 +381,19 @@ var AppIconOverride = {
         this.emit('sync-tooltip');
 
         return false;
+    }
+}
+
+//-------------- layout ---------------------------------------------------
+var HotCornerOverride = {
+    _toggleOverview: function(){
+        if (!gOptions.get('fullscreenHotCorner') && this._monitor.inFullscreen && !Main.overview.visible)
+            return;
+        if (Main.overview.shouldToggleByCornerOrButton()) {
+            Main.overview.toggle();
+            if (Main.overview.animationInProgress)
+                this._ripples.playAnimation(this._x, this._y);
+        }
     }
 }
 
