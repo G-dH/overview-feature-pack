@@ -328,7 +328,8 @@ var AppIconOverride = {
     },
 
     popupMenu: function(side = St.Side.LEFT) {
-        this.setForcedHighlight(true);
+        if (shellVersion >= 42)
+            this.setForcedHighlight(true);
         this._removeMenuTimeout();
         this.fake_release();
 
@@ -346,7 +347,8 @@ var AppIconOverride = {
                 if (!isPoppedUp)
                     this._onMenuPoppedDown();
             });
-            Main.overview.connectObject('hiding',
+            //Main.overview.connectObject('hiding',
+            Main.overview.connect('hiding',
                 () => this._menu.close(), this);
 
             Main.uiGroup.add_actor(this._menu.actor);
