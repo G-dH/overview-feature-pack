@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="overview-feature-pack">
+  <schema id="org.gnome.shell.extensions.overview-feature-pack" path="/org/gnome/shell/extensions/overview-feature-pack/">
+
+    <key type="b" name="dash-hover-icon-highlights-windows">
+      <default>true</default>
+    </key>
+    <key type="b" name="dash-show-windows-before-activation">
+      <default>false</default>
+    </key>
+    <key type="b" name="dash-click-follows-recent-window">
+      <default>true</default>
+    </key>
+    <key type="b" name="dash-scroll-switches-app-windows-ws">
+      <default>true</default>
+    </key>
+    <key type="b" name="space-activates-dash">
+      <default>true</default>
+    </key>
+    <key type="b" name="move-titles-into-windows">
+      <default>true</default>
+    </key>
+    <key type="b" name="dash-shift-click-moves-app-to-current-ws">
+      <default>true</default>
+    </key>
+    <key type="b" name="add-reorder-ws">
+      <default>true</default>
+    </key>
+    <key type="b" name="hover-activates-window-on-leave">
+      <default>false</default>
+    </key>
+    <key type="b" name="app-menu-move-app-to-ws">
+      <default>true</default>
+    </key>
+    <key type="b" name="app-menu-force-quit">
+      <default>true</default>
+    </key>
+  </schema>
+</schemalist>
