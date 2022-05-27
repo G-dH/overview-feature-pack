@@ -1,2 +1,5 @@
-# overview-feature-pack
-GNOME Shell extension that adds features to Activities Overview
+# Overview Feature Pack
+
+A GNOME Shell extension that adds usefull features to the Activities Overview.
+
+![OFP configuration window](screenshot.png)
