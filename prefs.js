@@ -562,6 +562,15 @@ function _getGeneralOptionList() {
         )
     );
 
+    optionList.push(
+        _optionsItem(
+            _('Always Show Window Titles'),
+            null,
+            _newSwitch(),
+            'alwaysShowWindowTitles'
+        )
+    );
+
     //-----------------------------------------------------
     optionList.push(
         _optionsItem(
@@ -571,7 +580,7 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('Shift Click Moves App To Current Workspace'),
+            _('Shift + Click Moves App To Current Workspace'),
             _('Clicking on app icon while holding down the Shift key will move all windows of the app to the current workspace.'),
             _newSwitch(),
             'dashShiftClickMovesAppToCurrentWs'
@@ -581,7 +590,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Highlight App Windows When Hovering Icon'),
-            'When hovering an app icon, all app window previews will show its titles amd the recently used window will be marked by green close button.',
+            'When hovering an app icon, all app window previews will show its titles and the recently used window will be marked by green close button.',
             _newSwitch(),
             'dashHoverIconHighlitsWindows'
         )
@@ -612,7 +621,7 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('Show the Most Recently Used Window'),
+            _('Prefer Most Recently Used Window'),
             'Tweak of the the previous option - the globally most recently used window will take precedence over the most recently used window of the current workspace.',
             preferMruWinBtn,
             'dashClickFollowsRecentWindow'

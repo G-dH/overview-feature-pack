@@ -23,6 +23,9 @@
     <key type="b" name="move-titles-into-windows">
       <default>true</default>
     </key>
+    <key type="b" name="always-show-window-titles">
+      <default>false</default>
+    </key>
     <key type="b" name="fullscreen-hot-corner">
       <default>true</default>
     </key>

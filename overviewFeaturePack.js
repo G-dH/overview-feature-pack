@@ -40,6 +40,7 @@ function activate() {
     _featurePackOverrides['WorkspacesDisplay'] = _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, WorkspacesDisplayOverride);
     _featurePackOverrides['AppIcon'] = _Util.overrideProto(AppDisplay.AppIcon.prototype, AppIconOverride);
     _featurePackOverrides['HotCorner'] = _Util.overrideProto(Layout.HotCorner.prototype, HotCornerOverride);
+    _featurePackOverrides['WindowPreview'] = _Util.overrideProto(WindowPreview.WindowPreview.prototype, WindowPreviewOverride);
     Main.layoutManager._updateHotCorners();
     _injectAppIcon();
     _injectWindowPreview();
@@ -68,6 +69,7 @@ function reset() {
     _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
     _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, _featurePackOverrides['WorkspacesDisplay']);
     _Util.overrideProto(Layout.HotCorner.prototype, _featurePackOverrides['HotCorner']);
+    _Util.overrideProto(WindowPreview.WindowPreview.prototype, _featurePackOverrides['WindowPreview']);
     _featurePackOverrides = {};
 
     const removeConnections = true;
@@ -96,6 +98,8 @@ function _injectWindowPreview() {
         WindowPreview.WindowPreview.prototype, '_init', function() {
             if (gOptions.get('moveTitlesIntoWindows'))
                 this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE;
+            if (gOptions.get('alwaysShowWindowTitles'))
+                this._title.show();
         }
     );
 
@@ -397,6 +401,99 @@ var HotCornerOverride = {
     }
 }
 
+var WindowPreviewOverride = {
+    showOverlay: function(animate) {
+        if (!this._overlayEnabled)
+            return;
+
+        if (this._overlayShown)
+            return;
+
+        this._overlayShown = true;
+        this._restack();
+
+        // If we're supposed to animate and an animation in our direction
+        // is already happening, let that one continue
+        const ongoingTransition = this._title.get_transition('opacity');
+        if (animate &&
+            ongoingTransition &&
+            ongoingTransition.get_interval().peek_final_value() === 255)
+            return;
+
+        const toShow = this._windowCanClose()
+            ? [this._closeButton]
+            : [];
+
+        if (!gOptions.get('alwaysShowWindowTitles')) {
+            toShow.push(this._title);
+        }
+
+        toShow.forEach(a => {
+            a.opacity = 0;
+            a.show();
+            a.ease({
+                opacity: 255,
+                duration: animate ? WindowPreview.WINDOW_OVERLAY_FADE_TIME : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+        });
+
+        const [width, height] = this.window_container.get_size();
+        const { scaleFactor } = St.ThemeContext.get_for_stage(global.stage);
+        const activeExtraSize = WindowPreview.WINDOW_ACTIVE_SIZE_INC * 2 * scaleFactor;
+        const origSize = Math.max(width, height);
+        const scale = (origSize + activeExtraSize) / origSize;
+
+        this.window_container.ease({
+            scale_x: scale,
+            scale_y: scale,
+            duration: animate ? WindowPreview.WINDOW_SCALE_TIME : 0,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+
+        this.emit('show-chrome');
+    },
+
+    hideOverlay: function(animate) {
+        if (!this._overlayShown)
+            return;
+
+        this._overlayShown = false;
+        this._restack();
+
+        // If we're supposed to animate and an animation in our direction
+        // is already happening, let that one continue
+        const ongoingTransition = this._title.get_transition('opacity');
+        if (animate &&
+            ongoingTransition &&
+            ongoingTransition.get_interval().peek_final_value() === 0)
+            return;
+
+        const toHide = [this._closeButton];
+
+        if (!gOptions.get('alwaysShowWindowTitles')) {
+            toHide.push(this._title);
+        }
+
+        toHide.forEach(a => {
+            a.opacity = 255;
+            a.ease({
+                opacity: 0,
+                duration: animate ? WindowPreview.WINDOW_OVERLAY_FADE_TIME : 0,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => a.hide(),
+            });
+        });
+
+        this.window_container.ease({
+            scale_x: 1,
+            scale_y: 1,
+            duration: animate ? WindowPreview.WINDOW_SCALE_TIME : 0,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+        });
+    }
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -473,6 +570,9 @@ function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
         if (!gOptions.get('dashScrollSwitchesAppWindowsWs'))
             return Clutter.EVENT_PROPAGATE;
 
+        if (_isPointerOut(Main.overview.dash))
+            return Clutter.EVENT_PROPAGATE;
+
         if (_delegate._scrollTime && (new Date() - _delegate._scrollTime) < 200) {
             return Clutter.EVENT_STOP;
         }
@@ -517,6 +617,10 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
     if (!gOptions.get('dashHoverIconHighlitsWindows'))
         return;
 
+    // this signal should work only for icons in the Dash, not for the App Display
+    if (_isPointerOut(Main.overview.dash))
+        return Clutter.EVENT_PROPAGATE;
+
     const _delegate = delegate;
     let onlyShowTitles = false;
     if (othersOpacity === 255) {
@@ -537,6 +641,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
             lastUsedWinForWs = w;
         }
     });
+
     const appRecentWorkspace = _getAppRecentWorkspace(app);
     const appLastUsedWindow = _getAppLastUsedWindow(app);
     
@@ -549,7 +654,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
     });
 
     viewsIter.forEach(view => {
-        // if workspaces on primary monitor only
+        // if workspaces are on primary monitor only
         if (!view || !view._workspaces)
             return;
 
@@ -572,7 +677,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                     }
                 } else {
                     opacity = othersOpacity;
-                    titleOpacity = 0;
+                    titleOpacity = gOptions.get('alwaysShowWindowTitles') ? 255 : 0;
                 }
 
                 // If we're supposed to animate and an animation in our direction
@@ -585,7 +690,9 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                             duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
                             onComplete: () => {
                                 if (titleOpacity === 0) {
-                                    windowPreview._title.hide();
+                                    if(gOptions.get('alwaysShowWindowTitles')) {
+                                        windowPreview._title.hide();
+                                    }
                                     windowPreview._closeButton.opacity = 0;
                                 } else {
                                     windowPreview._title.show();
@@ -630,4 +737,25 @@ function _getAppRecentWorkspace(app) {
         return recentWin.get_workspace();
 
     return null;
+}
+
+function _isPointerOut(widget) {
+    const primaryMonitor = Main.layoutManager.primaryMonitor;
+    const mX = primaryMonitor.x;
+    const mY = primaryMonitor.y;
+    let [x, y, mods] = global.get_pointer();
+    let margin = 0;
+
+    // dash's position in the overview is relative to the primary monitor but the pointer returns absolute position
+    x -= mX;
+    y -= mY;
+
+    if (x < (widget.allocation.x1 - margin) || x > (widget.allocation.x1 + widget.width + margin)) {
+        return true;
+    }
+    if (y < (widget.allocation.y1 - margin) || y > (widget.allocation.y1 + widget.height + margin)) {
+        return true;
+    }
+
+    return false;
 }

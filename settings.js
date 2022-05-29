@@ -31,8 +31,12 @@ var Options = class Options {
             hoverActivatesWindowOnLeave: ['boolean', 'hover-activates-window-on-leave'],
             appMenuMoveAppToWs: ['boolean', 'app-menu-move-app-to-ws'],
             appMenuForceQuit:['boolean', 'app-menu-force-quit'],
-            fullscreenHotCorner: ['boolean', 'fullscreen-hot-corner']
+            fullscreenHotCorner: ['boolean', 'fullscreen-hot-corner'],
+            alwaysShowWindowTitles: ['boolean', 'always-show-window-titles']
         }
+        this.cachedOptions = {};
+
+        this.connect('changed', this._updateCachedSettings.bind(this));
     }
 
     connect(name, callback) {
@@ -49,16 +53,24 @@ var Options = class Options {
         }
     }
 
-    get(option) {
-        const [format, key, settings] = this.options[option];
+    _updateCachedSettings(settings, key) {
+        Object.keys(this.options).forEach(v => this.get(v, true));
+    }
 
-        let gSettings = this._gsettings;
+    get(option, updateCache = false) {
+        if (updateCache || this.cachedOptions[option] === undefined) {
+            const [format, key, settings] = this.options[option];
+            let gSettings;
+            if (settings !== undefined) {
+                gSettings = settings();
+            } else {
+                gSettings = this._gsettings;
+            }
 
-        if (settings !== undefined) {
-            gSettings = settings();
+            this.cachedOptions[option] = gSettings.get_value(key).deep_unpack();
         }
 
-        return gSettings.get_value(key).deep_unpack();
+        return this.cachedOptions[option];
     }
 
     set(option, value) {
