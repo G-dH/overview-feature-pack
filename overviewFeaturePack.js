@@ -2,13 +2,12 @@
 // GPL v3 ©G-dH@Github.com
 'use strict';
 
-const { Clutter, Gio, GLib, GObject, Meta, Shell, St } = imports.gi;
+const { Clutter, GLib, Meta, Shell, St } = imports.gi;
 const { AppMenu } = imports.ui.appMenu;
 const PopupMenu = imports.ui.popupMenu;
 const BoxPointer = imports.ui.boxpointer;
 const Layout = imports.ui.layout;
 const Main = imports.ui.main;
-
 const AppDisplay = imports.ui.appDisplay;
 const Dash = imports.ui.dash;
 const OverviewControls = imports.ui.overviewControls;
@@ -100,6 +99,7 @@ function _injectWindowPreview() {
                 this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE;
             if (gOptions.get('alwaysShowWindowTitles'))
                 this._title.show();
+                this._title.opacity = 255;
         }
     );
 
@@ -162,10 +162,10 @@ function _updateDash(remove = false) {
         }
     });
 
-    // After resetting the Shell, some running icons don't appear in Dash, _redisplay() helps
+    // After resetting the Shell, some running apps don't appear in Dash, _redisplay() helps
     _dashRedisplayTimeoutId =  GLib.timeout_add(
         GLib.PRIORITY_DEFAULT,
-        5000,
+        3000,
         () => {
             Main.overview.dash._redisplay();
             _dashRedisplayTimeoutId = 0;
