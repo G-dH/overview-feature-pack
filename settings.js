@@ -1,4 +1,4 @@
-// Workspace Switcher Manager
+// Overview Feature Pack
 // GPL v3 ©G-dH@Github.com
 'use strict';
 
@@ -31,8 +31,11 @@ var Options = class Options {
             hoverActivatesWindowOnLeave: ['boolean', 'hover-activates-window-on-leave'],
             appMenuMoveAppToWs: ['boolean', 'app-menu-move-app-to-ws'],
             appMenuForceQuit:['boolean', 'app-menu-force-quit'],
+            appMenuCloseWindowsOnCurrentWs: ['boolean', 'app-menu-close-windows-on-current-ws'],
             fullscreenHotCorner: ['boolean', 'fullscreen-hot-corner'],
-            alwaysShowWindowTitles: ['boolean', 'always-show-window-titles']
+            alwaysShowWindowTitles: ['boolean', 'always-show-window-titles'],
+            searchWindowsEnable: ['boolean', 'search-windows-enable'],
+            searchWindowsSpaceKey: ['boolean', 'search-windows-space-key'],
         }
         this.cachedOptions = {};
 

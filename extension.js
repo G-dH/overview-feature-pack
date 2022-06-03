@@ -1,4 +1,4 @@
-// Workspace Switcher Manager
+// Overview Feature Pack
 // GPL v3 ©G-dH@Github.com
 'use strict';
 

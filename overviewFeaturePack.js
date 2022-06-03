@@ -1,4 +1,4 @@
-// Workspace Switcher Manager
+// Overview Feature Pack
 // GPL v3 ©G-dH@Github.com
 'use strict';
 
@@ -19,6 +19,8 @@ const Me = ExtensionUtils.getCurrentExtension();
 const Settings = Me.imports.settings;
 const shellVersion = Settings.shellVersion;
 
+const WindowSearchProvider = Me.imports.windowSearchProvider;
+
 const _Util = Me.imports.util;
 
 
@@ -32,6 +34,12 @@ let gOptions;
 
 function activate() {
     gOptions = new Settings.Options();
+    gOptions.connect('changed::search-windows-enable', () => {
+        if (gOptions.get('searchWindowsEnable'))
+            WindowSearchProvider.enable();
+        else
+            WindowSearchProvider.disable();
+    });
 
     if (Object.keys(_featurePackOverrides).length != 0)
         reset();
@@ -44,6 +52,10 @@ function activate() {
     _injectAppIcon();
     _injectWindowPreview();
     _updateDash();
+
+    if (gOptions.get('searchWindowsEnable')) {
+        WindowSearchProvider.enable();
+    }
 
     Main.overview.connect('hiding', () => {
         if (global.windowToActivate) {
@@ -78,6 +90,9 @@ function reset() {
         GLib.source_remove(_dashRedisplayTimeoutId);
         _dashRedisplayTimeoutId = 0;
     }
+
+    WindowSearchProvider.disable();
+
     gOptions.destroy();
     gOptions = null;
 }
@@ -210,19 +225,20 @@ var WorkspacesDisplayOverride = {
     },
 
     _onKeyPressEvent: function(actor, event) {
+        const symbol = event.get_key_symbol();
         const { ControlsState } = OverviewControls;
-        if (this._overviewAdjustment.value !== ControlsState.WINDOW_PICKER)
+        if (this._overviewAdjustment.value !== ControlsState.WINDOW_PICKER && symbol !== Clutter.KEY_space)
             return Clutter.EVENT_PROPAGATE;
 
         if (!this.reactive)
             return Clutter.EVENT_PROPAGATE;
-
+        const isCtrlPressed = (event.get_state() & Clutter.ModifierType.CONTROL_MASK) != 0;
         const { workspaceManager } = global;
         const vertical = workspaceManager.layout_rows === -1;
         const rtl = this.get_text_direction() === Clutter.TextDirection.RTL;
 
         let which;
-        switch (event.get_key_symbol()) {
+        switch (symbol) {
         case Clutter.KEY_Page_Up:
             if (vertical)
                 which = Meta.MotionDirection.UP;
@@ -245,10 +261,18 @@ var WorkspacesDisplayOverride = {
         case Clutter.KEY_End:
             which = workspaceManager.n_workspaces - 1;
             break;
-        case Clutter.KEY_Tab:
         case Clutter.KEY_space:
-            if (gOptions.get('spaceActivatesDash'))
+            if (isCtrlPressed && gOptions.get('spaceActivatesDash')) {
                 Main.ctrlAltTabManager._items.forEach(i => {if (i.sortGroup === 1 && i.name === 'Dash') Main.ctrlAltTabManager.focusGroup(i)});
+            } else if (gOptions.get('searchWindowsSpaceKey')) {
+                const prefix = _('windows: ');
+                const position = prefix.length;
+                const searchEntry = Main.overview._overview._controls._searchEntry;
+                searchEntry.set_text(prefix);
+                searchEntry.grab_key_focus();
+                searchEntry.get_first_child().set_cursor_position(position);
+                searchEntry.get_first_child().set_selection(position, position);
+            }
             return Clutter.EVENT_STOP;
         default:
             return Clutter.EVENT_PROPAGATE;
@@ -341,42 +365,76 @@ var AppIconOverride = {
         this._removeMenuTimeout();
         this.fake_release();
 
-        if (this._menu)
-            this._menu.destroy();
-        this._menu = null;
-
         if (!this._menu) {
             this._menu = new AppMenu(this, side, {
                 favoritesSection: true,
                 showSingleWindows: true,
             });
+
             this._menu.setApp(this.app);
-            this._menu.connect('open-state-changed', (menu, isPoppedUp) => {
+            this._openSigId = this._menu.connect('open-state-changed', (menu, isPoppedUp) => {
                 if (!isPoppedUp)
                     this._onMenuPoppedDown();
             });
             //Main.overview.connectObject('hiding',
-            Main.overview.connect('hiding',
+            this._hidingSigId = Main.overview.connect('hiding',
                 () => this._menu.close(), this);
 
             Main.uiGroup.add_actor(this._menu.actor);
             this._menuManager.addMenu(this._menu);
 
-            this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-            const popupItems =[];
-            if (this.app.get_n_windows()) {
-                if (gOptions.get('appMenuForceQuit'))
-                    popupItems.push([_('Force Quit'), () => this.app.get_windows()[0].kill()]);
-                if (gOptions.get('appMenuMoveAppToWs'))
-                    popupItems.push([_('Move App to Current Workspace'), this._moveAppToCurrentWorkspace]);
+            this._getWindowsOnCurrentWs = function() {
+                const winList = [];
+                this.app.get_windows().forEach(w => {
+                    if(w.get_workspace() === global.workspace_manager.get_active_workspace()) winList.push(w)
+                });
+                return winList;
+            }
+            this._windowsOnOtherWs = function() {
+                return (this.app.get_windows().length - this._getWindowsOnCurrentWs().length) > 0;
+            }
+        }
+
+
+        // once the menu is created, it stays unchanged
+        if (this._addedMenuItems && this._addedMenuItems.length) {
+            this._addedMenuItems.forEach(i => i.destroy());
+        }
+
+        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const popupItems =[];
+        if (this.app.get_n_windows()) {
+            if (gOptions.get('appMenuForceQuit')) {
+                popupItems.push([_('Force Quit'), () => this.app.get_windows()[0].kill()]);
             }
 
-             popupItems.forEach(i => {
-                 let item = new PopupMenu.PopupMenuItem(i[0]);
-                 this._menu.addMenuItem(item);
-                 item.connect('activate', i[1].bind(this));
-             });
+            if (gOptions.get('appMenuCloseWindowsOnCurrentWs')) {
+                const nWin = this._getWindowsOnCurrentWs().length;
+                if (nWin) {
+                    popupItems.push([_(`Close ${nWin} Windows on Current Workspace`), () => {
+                        const windows = this._getWindowsOnCurrentWs();
+                        let time = global.get_current_time();
+                        for (let win of windows) {
+                            // increase time by 1 ms for each window to avoid errors from GS
+                            win.delete(time++);
+                        }
+                    }]);
+                }
+            }
+
+            if (gOptions.get('appMenuMoveAppToWs') && this._windowsOnOtherWs()) {
+                popupItems.push([_('Move App to Current Workspace'), this._moveAppToCurrentWorkspace]);
+            }
         }
+
+        this._addedMenuItems = [];
+        popupItems.forEach(i => {
+            let item = new PopupMenu.PopupMenuItem(i[0]);
+            this._menu.addMenuItem(item);
+            item.connect('activate', i[1].bind(this));
+            this._addedMenuItems.push(item);
+        });
 
         this.emit('menu-state-changed', true);
 

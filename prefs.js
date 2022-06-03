@@ -1,4 +1,4 @@
-// Workspace Switcher Manager
+// Overview Feature Pack
 // GPL v3 ©G-dH@Github.com
 'use strict';
 
@@ -528,8 +528,8 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('Space Activates Dash'),
-            _('Pressing Space key in the overview will activate Dash. You can navigate between app icons by left / right arrow keys and activate the app using Space or Enter key.'),
+            _('Ctrl + Space Activates Dash'),
+            _('Pressing Ctrl + Space bar in the overview activates Dash. You can navigate between app icons using left / right arrow keys and activate the app using Space or Enter key.'),
             _newSwitch(),
             'spaceActivatesDash'
         )
@@ -538,9 +538,18 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Move Titles Into Windows'),
-            _('Move title captions up into the window preview so they will better visible and associated to the window.'),
+            _('Moves captions with window titles up into the window previews to make them more visible and associated with the window.'),
             _newSwitch(),
             'moveTitlesIntoWindows'
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Always Show Window Titles'),
+            null,
+            _newSwitch(),
+            'alwaysShowWindowTitles'
         )
     );
 
@@ -559,15 +568,6 @@ function _getGeneralOptionList() {
             _('Allows hot corner in fullscreen mode.'),
             _newSwitch(),
             'fullscreenHotCorner'
-        )
-    );
-
-    optionList.push(
-        _optionsItem(
-            _('Always Show Window Titles'),
-            null,
-            _newSwitch(),
-            'alwaysShowWindowTitles'
         )
     );
 
@@ -653,6 +653,53 @@ function _getGeneralOptionList() {
             'Adds item that allows you to move all windows of the app to the current workspace.',
             _newSwitch(),
             'appMenuMoveAppToWs'
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Close Windows on Current Workspace'),
+            'Adds item that allows you to close all windows of the app on the current workspace. This item appears only if at least one window is available',
+            _newSwitch(),
+            'appMenuCloseWindowsOnCurrentWs'
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Window Search Provider'),
+        )
+    );
+
+    const wspSwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Enable Window Search Provider'),
+            'Activates built-in window search provider to add open windows to the search results. You can search app names and window titles. You can also use "wq " prefix to suppress results from other search providers. Search supports fuzzy matches, more weight has exact match and then windows from current workspace.',
+            wspSwitch,
+            'searchWindowsEnable'
+        )
+    );
+
+    const wspSpaceSwitch = _newSwitch();
+    wspSpaceSwitch.connect('notify::active', () => {
+        if (wspSpaceSwitch.active) {
+            wspSwitch.active = true;
+        }
+    });
+
+    wspSwitch.connect('notify::active', () => {
+        if (!wspSwitch.active) {
+            wspSpaceSwitch.active = false;
+        }
+    });
+
+    optionList.push(
+        _optionsItem(
+            _('Space Activates Window Search'),
+            'Pressing the Space bar in Overview window picker activates the window search.',
+            wspSpaceSwitch,
+            'searchWindowsSpaceKey'
         )
     );
 

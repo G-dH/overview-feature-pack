@@ -41,5 +41,14 @@
     <key type="b" name="app-menu-force-quit">
       <default>true</default>
     </key>
+    <key type="b" name="app-menu-close-windows-on-current-ws">
+      <default>true</default>
+    </key>
+    <key type="b" name="search-windows-enable">
+      <default>true</default>
+    </key>
+    <key type="b" name="search-windows-space-key">
+      <default>true</default>
+    </key>
   </schema>
 </schemalist>
