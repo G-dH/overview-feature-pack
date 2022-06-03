@@ -682,16 +682,9 @@ function _getGeneralOptionList() {
     );
 
     const wspSpaceSwitch = _newSwitch();
-    wspSpaceSwitch.connect('notify::active', () => {
-        if (wspSpaceSwitch.active) {
-            wspSwitch.active = true;
-        }
-    });
 
     wspSwitch.connect('notify::active', () => {
-        if (!wspSwitch.active) {
-            wspSpaceSwitch.active = false;
-        }
+        wspSpaceSwitch.sensitive = wspSwitch.active;
     });
 
     optionList.push(
