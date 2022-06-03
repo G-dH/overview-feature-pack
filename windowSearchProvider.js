@@ -6,6 +6,8 @@ const { GObject, Gio, Gtk, Meta, St, Shell } = imports.gi;
 
 const Main = imports.ui.main;
 const ExtensionUtils = imports.misc.extensionUtils;
+const Me = ExtensionUtils.getCurrentExtension();
+const _ = Me.imports.settings._;
 
 let windowSearchProvider = null;
 
@@ -63,7 +65,7 @@ function match(pattern, string) {
 
 function makeResult(window, i) {
     const app = Shell.WindowTracker.get_default().get_window_app(window);
-    const appName = app ? app.get_name() : _('Unknown');
+    const appName = app ? app.get_name() : 'Unknown';
     const windowTitle = window.get_title();
     const wsIndex = window.get_workspace().index();
 
@@ -77,16 +79,16 @@ function makeResult(window, i) {
     }
 }
 
-var WindowSearchProvider = GObject.registerClass(
-class WindowSearchProvider extends GObject.Object{
-    _init() {
-        this.appInfo = {
-            get_description: () => _('List of open windows'),
-            get_name: () => _('Open Windows'),
-            get_id: () => 'gdh.window-search-provider',
-            get_icon: () => Gio.icon_new_for_string('focus-windows-symbolic'),
-            should_show: () => true
-        }
+var WindowSearchProvider = class WindowSearchProvider {
+    constructor() {
+        this.appInfo = Gio.DesktopAppInfo.new('org.gnome.Nautilus.desktop');
+        this.appInfo.get_description = () => 'List of open windows';
+        this.appInfo.get_name = () => 'Open Windows';
+        this.appInfo.get_id = () => Me.metadata.uuid;
+        this.appInfo.get_icon = () => Gio.icon_new_for_string('focus-windows-symbolic');
+        this.appInfo.should_show = () => true;
+        this.appInfo.canLaunchSearch = () => false;
+        this.appInfo.isRemoteProvider = () => true;
     }
 
     _getResultSet (terms) {
@@ -176,7 +178,7 @@ class WindowSearchProvider extends GObject.Object{
         const app = Shell.WindowTracker.get_default().get_window_app(resultMeta.id);
         return new AppIcon(app);
     }
-});
+}
 
 function init() {
 }
