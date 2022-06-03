@@ -77,7 +77,7 @@ function makeResult(window, i) {
     }
 }
 
-var WindowSearchProvider = new GObject.registerClass(
+var WindowSearchProvider = GObject.registerClass(
 class WindowSearchProvider extends GObject.Object{
     _init() {
         this.appInfo = {
