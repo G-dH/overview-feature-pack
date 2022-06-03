@@ -92,7 +92,7 @@ var WindowSearchProvider = class WindowSearchProvider {
     }
 
     _getResultSet (terms) {
-        if (terms[0] === 'wq' || terms[0] === 'windows:') {
+        if (terms[0] === 'wq' || terms[0] === 'wq:') {
             terms.splice(0,1);
             if (!terms.length) {
                 terms = [' '];

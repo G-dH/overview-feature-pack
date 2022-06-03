@@ -265,7 +265,7 @@ var WorkspacesDisplayOverride = {
             if (isCtrlPressed && gOptions.get('spaceActivatesDash')) {
                 Main.ctrlAltTabManager._items.forEach(i => {if (i.sortGroup === 1 && i.name === 'Dash') Main.ctrlAltTabManager.focusGroup(i)});
             } else if (gOptions.get('searchWindowsSpaceKey')) {
-                const prefix = _('windows: ');
+                const prefix = _('wq: ');
                 const position = prefix.length;
                 const searchEntry = Main.overview._overview._controls._searchEntry;
                 searchEntry.set_text(prefix);
