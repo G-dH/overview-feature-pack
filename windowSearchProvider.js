@@ -9,8 +9,18 @@ const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
 const _ = Me.imports.settings._;
 
+const ModifierType = imports.gi.Clutter.ModifierType;
+
 let windowSearchProvider = null;
 let _enableTimeoutId = 0;
+
+const Action = {
+    NONE: 0,
+    CLOSE: 1,
+    CLOSE_ALL: 2,
+    MOVE_TO_WS: 3,
+    MOVE_ALL_TO_WS: 4
+}
 
 function init() {
 }
@@ -96,31 +106,63 @@ function makeResult(window, i) {
     return {
       'id': i,
       // convert all accented chars to their basic form and lower case for search
-      'name': `${wsIndex + 1}: ${appName}: ${windowTitle}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+      'name': `${wsIndex + 1}: ${windowTitle} ${appName}:`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
       'appName': appName,
       'windowTitle': windowTitle,
       'window': window
     }
 }
 
+const closeSelectedRegex = /\/x$/;
+const closeAllResultsRegex = /\/xa$/;
+const moveToWsRegex = /\/m[0-9]+$/;
+const moveAllToWsRegex = /\/ma[0-9]+$/;
+const forceKillRegex = /fk$/;
+
 var WindowSearchProvider = class WindowSearchProvider {
     constructor() {
-        this.appInfo = Gio.DesktopAppInfo.new('org.gnome.Nautilus.desktop');
+        this.appInfo = Gio.AppInfo.create_from_commandline('true', 'Open Windows', null);
         this.appInfo.get_description = () => 'List of open windows';
         this.appInfo.get_name = () => 'Open Windows';
         this.appInfo.get_id = () => Me.metadata.uuid;
         this.appInfo.get_icon = () => Gio.icon_new_for_string('focus-windows-symbolic');
         this.appInfo.should_show = () => true;
-        this.appInfo.canLaunchSearch = () => false;
-        this.appInfo.isRemoteProvider = () => true;
+        this.id = Me.metadata.uuid;
+        this.title = 'Window Search Provider',
+        this.canLaunchSearch = true;
+        this.isRemoteProvider = true;
+
+        this.prefix = 'wq:';
     }
 
     _getResultSet (terms) {
-        if (terms[0] === 'wq' || terms[0] === 'wq:') {
+        if (terms[0] === this.prefix.replace(':', '') || terms[0] === this.prefix) {
             terms.splice(0,1);
             if (!terms.length) {
                 terms = [' '];
             }
+        }
+
+        this.action = 0;
+        this.targetWs = 0;
+
+        const lastTerm = terms[terms.length - 1];
+        if (lastTerm.match(closeSelectedRegex)) {
+            this.action = Action.CLOSE;
+        } else if (lastTerm.match(closeAllResultsRegex)) {
+            this.action = Action.CLOSE_ALL;
+        } else if (lastTerm.match(moveToWsRegex)) {
+            this.action = Action.MOVE_TO_WS;
+        } else if (lastTerm.match(moveAllToWsRegex)) {
+            this.action = Action.MOVE_ALL_TO_WS;
+        }
+        if (this.action) {
+            terms.pop();
+            if (this.action === Action.MOVE_TO_WS || this.action === Action.MOVE_ALL_TO_WS) {
+                this.targetWs = parseInt(lastTerm.replace(/^[^0-9]+/, ''));
+            }
+        } else if (lastTerm.startsWith('/')) {
+            terms.pop();
         }
 
         const candidates = this.windows;
@@ -173,9 +215,63 @@ var WindowSearchProvider = class WindowSearchProvider {
     }
         
     activateResult (resultId, terms) {
-            const result = this.windows[resultId]
-            Main.activateWindow(result.window)
-            //Main.overview.hide();
+        const [,,state] = global.get_pointer();
+
+        const isCtrlPressed = (state & ModifierType.CONTROL_MASK) != 0;
+        const isShiftPressed = (state & ModifierType.SHIFT_MASK) != 0;
+
+        if (!this.action) {
+            const currentWs = global.workspaceManager.get_active_workspace().index() + 1;
+            if (isShiftPressed && !isCtrlPressed) {
+                this.action = Action.MOVE_TO_WS;
+                this.targetWs = currentWs;
+            } else if (isShiftPressed && isCtrlPressed) {
+                this.action = Action.MOVE_ALL_TO_WS;
+                this.targetWs = currentWs;
+            }
+        }
+
+
+        if (!this.action) {
+            const result = this.windows[resultId];
+            Main.activateWindow(result.window);
+            return;
+        }
+
+        switch (this.action) {
+        case Action.CLOSE:
+            this._closeWindows([resultId]);
+            break;
+        case Action.CLOSE_ALL:
+            this._closeWindows(this.resultIds);
+            break;
+        case Action.MOVE_TO_WS:
+            this._moveWindowsToWs(resultId, [resultId], this.targetWs);
+            break;
+        case Action.MOVE_ALL_TO_WS:
+            this._moveWindowsToWs(resultId, this.resultIds, this.targetWs);
+            break;
+        }
+    }
+
+    _closeWindows(ids) {
+        let time = global.get_current_time();
+        for (let i = 0; i < ids.length; i++) {
+            this.windows[ids[i]].window.delete(time + i);
+        }
+        Main.notify('Window Search Provider', `Closed ${ids.length} windows.`);
+    }
+
+    _moveWindowsToWs(selectedId, resultIds, wsIndex) {
+        if (!wsIndex || wsIndex > global.workspaceManager.n_workspaces) {
+            return false;
+        }
+        const ws = global.workspaceManager.get_workspace_by_index(wsIndex - 1);
+        for (let i = 0; i < resultIds.length; i++) {
+            this.windows[resultIds[i]].window.change_workspace(ws);
+        }
+        const selectedWin = this.windows[selectedId].window;
+        Main.activateWindow(selectedWin);
     }
 
     getInitialResultSet (terms, callback, cancellable) {
@@ -194,8 +290,7 @@ var WindowSearchProvider = class WindowSearchProvider {
     
     getSubsearchResultSet (previousResults, terms, callback, cancellable) {
         // if we return previous results, quick typers get non-actual results
-        return this.getInitialResultSet(terms, callback, cancellable);
-        //return previousResults;
+        callback(this._getResultSet(terms));
     }
 
     createResultOjbect(resultMeta) {
