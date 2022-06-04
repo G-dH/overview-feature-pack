@@ -28,6 +28,10 @@ const set_child = shellVersion < 40 ? 'add' : 'set_child';
 
 const GENERAL_TITLE = _('General');
 const GENERAL_ICON = 'preferences-system-symbolic';
+const DASH_TITLE = _('Dash');
+const DASH_ICON = 'view-app-grid-symbolic';
+const MISC_TITLE = _('Misc');
+const MISC_ICON = 'preferences-other-symbolic';
 
 function _newImageFromIconName(name, size = null) {
     const args = shellVersion >= 40 ? [name] : [name, size];
@@ -42,12 +46,22 @@ function init() {
 
 // this function is called by GS42 if available and returns libadwaita prefes window
 function fillPreferencesWindow(window) {
-    const generalOptionsPage   = getAdwPage(_getGeneralOptionList(), {
+    const overviewOptionsPage = getAdwPage(_getGeneralOptionList(), {
         title: GENERAL_TITLE,
         icon_name: GENERAL_ICON,
     });
+    const dashOptionsPage = getAdwPage(_getDashOptionList(), {
+        title: DASH_TITLE,
+        icon_name: DASH_ICON
+    });
+    const miscOptionsPage = getAdwPage(_getMiscOptionList(), {
+        title: MISC_TITLE,
+        icon_name: MISC_ICON
+    });
 
-    window.add(generalOptionsPage);
+    window.add(overviewOptionsPage);
+    window.add(dashOptionsPage);
+    window.add(miscOptionsPage);
 
     window.set_search_enabled(true);
 
@@ -94,9 +108,13 @@ function buildPrefsWidget() {
     stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
 
     stack.add_named(getLegacyPage(_getGeneralOptionList()), 'general');
+    stack.add_named(getLegacyPage(_getDashOptionList()), 'dash');
+    stack.add_named(getLegacyPage(_getMiscOptionList()), 'misc');
 
     const pagesBtns = [
         [new Gtk.Label({ label: GENERAL_TITLE}), _newImageFromIconName(GENERAL_ICON, Gtk.IconSize.BUTTON)],
+        [new Gtk.Label({ label: DASH_TITLE}), _newImageFromIconName(DASH_ICON, Gtk.IconSize.BUTTON)],
+        [new Gtk.Label({ label: MISC_TITLE}), _newImageFromIconName(MISC_ICON, Gtk.IconSize.BUTTON)],
     ];
 
     let stBtn = stackSwitcher.get_first_child ? stackSwitcher.get_first_child() : null;
@@ -529,7 +547,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Ctrl + Space Activates Dash'),
-            _('Pressing Ctrl + Space bar in the overview activates Dash. You can navigate between app icons using left / right arrow keys and activate the app using Space or Enter key.'),
+            _('Pressing Ctrl + Space bar in the overview activates Dash. You can navigate between app icons using Tab, left/right arrow keys and activate the app using Space or Enter key.'),
             _newSwitch(),
             'spaceActivatesDash'
         )
@@ -564,6 +582,12 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
+            _('Hot Corner'),
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
             _('Fullscreen Hot Corner'),
             _('Allows hot corner in fullscreen mode.'),
             _newSwitch(),
@@ -571,7 +595,15 @@ function _getGeneralOptionList() {
         )
     );
 
-    //-----------------------------------------------------
+    return optionList;
+}
+
+//-----------------------------------------------------
+function _getDashOptionList() {
+    const optionList = [];
+    // options item format:
+    // [text, tooltip, widget, settings-variable, options for combo]
+
     optionList.push(
         _optionsItem(
             _('Dash'),
@@ -590,7 +622,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Highlight App Windows When Hovering Icon'),
-            'When hovering an app icon, all app window previews will show its titles and the recently used window will be marked by green close button.',
+            'When hovering an app icon, all app window previews will show their titles and the recently used window will be marked by green close button.',
             _newSwitch(),
             'dashHoverIconHighlitsWindows'
         )
@@ -664,6 +696,15 @@ function _getGeneralOptionList() {
             'appMenuCloseWindowsOnCurrentWs'
         )
     );
+
+    return optionList
+}
+    //--------------------------------------------------------------------
+
+function _getMiscOptionList() {
+    const optionList = [];
+    // options item format:
+    // [text, tooltip, widget, settings-variable, options for combo]
 
     optionList.push(
         _optionsItem(
