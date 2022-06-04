@@ -2,7 +2,7 @@
 // GPL v3 ©G-dH@Github.com
 'use strict';
 
-const { GObject, Gio, Gtk, Meta, St, Shell } = imports.gi;
+const { GLib, GObject, Gio, Gtk, Meta, St, Shell } = imports.gi;
 
 const Main = imports.ui.main;
 const ExtensionUtils = imports.misc.extensionUtils;
@@ -10,6 +10,45 @@ const Me = ExtensionUtils.getCurrentExtension();
 const _ = Me.imports.settings._;
 
 let windowSearchProvider = null;
+let _enableTimeoutId = 0;
+
+function init() {
+}
+
+function getOverviewSearchResult() {
+        return Main.overview._overview.controls._searchController._searchResults;
+}
+
+function enable() {
+    // delay because Fedora had problem to register a new provider soon after Shell restarts
+    _enableTimeoutId = GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        2000,
+        () => {
+            if (windowSearchProvider == null) {
+                windowSearchProvider = new WindowSearchProvider();
+                getOverviewSearchResult()._registerProvider(
+                    windowSearchProvider
+                );
+            }
+            _enableTimeoutId = 0;
+            return GLib.SOURCE_REMOVE;
+        }
+    );
+}
+
+function disable() {
+    if (windowSearchProvider) {
+        getOverviewSearchResult()._unregisterProvider(
+            windowSearchProvider
+        );
+        windowSearchProvider = null;
+    }
+    if (_enableTimeoutId) {
+        GLib.source_remove(_enableTimeoutId);
+        _enableTimeoutId = 0;
+    }
+}
 
 function fuzzyMatch(term, text) {
     let pos = -1;
@@ -46,21 +85,6 @@ function fuzzyMatch(term, text) {
     // add all position to get a waight of the result
     // results closer to the beginning of the text and term characters closer to each other will gain more weigt.
     return matches.reduce((r, p) => r + p) - matches.length * matches[0] + matches[0];
-}
-
-function match(pattern, string) {
-    // remove diacritics and accents from letters
-    let s = string.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    let p = pattern.toLowerCase();
-    let ps = p.split(/ +/);
-
-    // allows to use multiple exact paterns separated by space in arbitrary order
-    for (let w of ps) {
-        if (!s.match(w)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 function makeResult(window, i) {
@@ -177,31 +201,5 @@ var WindowSearchProvider = class WindowSearchProvider {
     createResultOjbect(resultMeta) {
         const app = Shell.WindowTracker.get_default().get_window_app(resultMeta.id);
         return new AppIcon(app);
-    }
-}
-
-function init() {
-}
-
-function getOverviewSearchResult() {
-        return Main.overview._overview.controls._searchController._searchResults;
-}
-
-function enable() {
-    if (windowSearchProvider == null) {
-        windowSearchProvider = new WindowSearchProvider();
-
-        getOverviewSearchResult()._registerProvider(
-            windowSearchProvider
-        );
-    }
-}
-
-function disable() {
-    if (windowSearchProvider) {
-        getOverviewSearchResult()._unregisterProvider(
-            windowSearchProvider
-        );
-        windowSearchProvider = null;
     }
 }
