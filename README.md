@@ -1,6 +1,6 @@
 # Overview Feature Pack
 
-A GNOME Shell extension that adds usefull features to the Activities Overview. See screenshots with preferences window below.
+A GNOME Shell extension that adds useful features to the Activities Overview. See screenshots with preferences window below.
 
 Supported versions of GNOME Shell: 41, 42.
 
