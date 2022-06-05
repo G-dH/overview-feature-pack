@@ -7,10 +7,12 @@ const { GLib, GObject, Gio, Gtk, Meta, St, Shell } = imports.gi;
 const Main = imports.ui.main;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
+const Settings = Me.imports.settings;
 const _ = Me.imports.settings._;
 
 const ModifierType = imports.gi.Clutter.ModifierType;
 
+let gOptions;
 let windowSearchProvider = null;
 let _enableTimeoutId = 0;
 
@@ -29,7 +31,8 @@ function getOverviewSearchResult() {
         return Main.overview._overview.controls._searchController._searchResults;
 }
 
-function enable() {
+function enable(options) {
+    gOptions = options;
     // delay because Fedora had problem to register a new provider soon after Shell restarts
     _enableTimeoutId = GLib.timeout_add(
         GLib.PRIORITY_DEFAULT,
@@ -58,6 +61,7 @@ function disable() {
         GLib.source_remove(_enableTimeoutId);
         _enableTimeoutId = 0;
     }
+    gOptions = null;
 }
 
 function fuzzyMatch(term, text) {
@@ -106,18 +110,17 @@ function makeResult(window, i) {
     return {
       'id': i,
       // convert all accented chars to their basic form and lower case for search
-      'name': `${wsIndex + 1}: ${windowTitle} ${appName}:`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+      'name': `${wsIndex + 1}: ${windowTitle} ${appName}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
       'appName': appName,
       'windowTitle': windowTitle,
       'window': window
     }
 }
 
-const closeSelectedRegex = /\/x$/;
-const closeAllResultsRegex = /\/xa$/;
-const moveToWsRegex = /\/m[0-9]+$/;
-const moveAllToWsRegex = /\/ma[0-9]+$/;
-const forceKillRegex = /fk$/;
+const closeSelectedRegex = /^\/x!$/;
+const closeAllResultsRegex = /^\/xa!$/;
+const moveToWsRegex = /^\/m[0-9]+$/;
+const moveAllToWsRegex = /^\/ma[0-9]+$/;
 
 var WindowSearchProvider = class WindowSearchProvider {
     constructor() {
@@ -130,8 +133,9 @@ var WindowSearchProvider = class WindowSearchProvider {
         this.id = Me.metadata.uuid;
         this.title = 'Window Search Provider',
         this.canLaunchSearch = true;
-        this.isRemoteProvider = true;
+        this.isRemoteProvider = false;
 
+        this.action = 0;
         this.prefix = 'wq:';
     }
 
@@ -143,26 +147,28 @@ var WindowSearchProvider = class WindowSearchProvider {
             }
         }
 
-        this.action = 0;
-        this.targetWs = 0;
+        if (gOptions.get('searchWindowsCommands')) {
+            this.action = 0;
+            this.targetWs = 0;
 
-        const lastTerm = terms[terms.length - 1];
-        if (lastTerm.match(closeSelectedRegex)) {
-            this.action = Action.CLOSE;
-        } else if (lastTerm.match(closeAllResultsRegex)) {
-            this.action = Action.CLOSE_ALL;
-        } else if (lastTerm.match(moveToWsRegex)) {
-            this.action = Action.MOVE_TO_WS;
-        } else if (lastTerm.match(moveAllToWsRegex)) {
-            this.action = Action.MOVE_ALL_TO_WS;
-        }
-        if (this.action) {
-            terms.pop();
-            if (this.action === Action.MOVE_TO_WS || this.action === Action.MOVE_ALL_TO_WS) {
-                this.targetWs = parseInt(lastTerm.replace(/^[^0-9]+/, ''));
+            const lastTerm = terms[terms.length - 1];
+            if (lastTerm.match(closeSelectedRegex)) {
+                this.action = Action.CLOSE;
+            } else if (lastTerm.match(closeAllResultsRegex)) {
+                this.action = Action.CLOSE_ALL;
+            } else if (lastTerm.match(moveToWsRegex)) {
+                this.action = Action.MOVE_TO_WS;
+            } else if (lastTerm.match(moveAllToWsRegex)) {
+                this.action = Action.MOVE_ALL_TO_WS;
             }
-        } else if (lastTerm.startsWith('/')) {
-            terms.pop();
+            if (this.action) {
+                terms.pop();
+                if (this.action === Action.MOVE_TO_WS || this.action === Action.MOVE_ALL_TO_WS) {
+                    this.targetWs = parseInt(lastTerm.replace(/^[^0-9]+/, ''));
+                }
+            } else if (lastTerm.startsWith('/')) {
+                terms.pop();
+            }
         }
 
         const candidates = this.windows;
@@ -213,8 +219,11 @@ var WindowSearchProvider = class WindowSearchProvider {
             }
         }
     }
-        
-    activateResult (resultId, terms) {
+
+    launchSearch(terms, timeStamp) {
+    }
+
+    activateResult (resultId, terms, timeStamp) {
         const [,,state] = global.get_pointer();
 
         const isCtrlPressed = (state & ModifierType.CONTROL_MASK) != 0;
@@ -222,7 +231,7 @@ var WindowSearchProvider = class WindowSearchProvider {
 
         if (!this.action) {
             const currentWs = global.workspaceManager.get_active_workspace().index() + 1;
-            if (isShiftPressed && !isCtrlPressed) {
+            if (isShiftPressed && !isCtrlPressed && gOptions.get('searchWindowsShiftMoves')) {
                 this.action = Action.MOVE_TO_WS;
                 this.targetWs = currentWs;
             } else if (isShiftPressed && isCtrlPressed) {

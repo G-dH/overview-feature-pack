@@ -723,19 +723,52 @@ function _getMiscOptionList() {
     );
 
     const wspSpaceSwitch = _newSwitch();
-
-    wspSwitch.connect('notify::active', () => {
-        wspSpaceSwitch.sensitive = wspSwitch.active;
-    });
-
     optionList.push(
         _optionsItem(
             _('Space Activates Window Search'),
-            'Pressing the Space bar in Overview window picker activates the window search.',
+            'Pressing the Space bar in the Overview window picker paste "wq: " prefix to the search entry to activate the search and suppress results from other search providers.',
             wspSpaceSwitch,
             'searchWindowsSpaceKey'
         )
     );
+
+    const wspCommandSwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Enable Commands in Search Entry'),
+            'You can use following commands separated by the space at the end of entered pattern:\n/x!   \t\t\t- close selected window\n/xa! \t\t\t- close all found windows\n/m[number] \t\t- (e.g. /m6) move selected window to workspace with given index\n/ma[number] \t- move all found windows to workspace with given index',
+            wspCommandSwitch,
+            'searchWindowsCommands'
+        )
+    );
+
+    const wspShiftSwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Shift Moves Window to Current Workspace'),
+            'Holding down the Shift key while activating the selected search result, moves the window to the curent workspace.',
+            wspShiftSwitch,
+            'searchWindowsShiftMoves'
+        )
+    );
+
+    const wspCtrlShiftSwitch = _newSwitch();
+    //wspCtrlShiftSwitch.visible = false;
+    optionList.push(
+        _optionsItem(
+            _('Ctrl+Shift Moves All Windows to Current Workspace'),
+            'Hold down the Ctrl and Shift keys while activating the search result to move all found windows to the current workspace and activate the selected window.',
+            wspCtrlShiftSwitch,
+            'searchWindowsShiftMoves'
+        )
+    );
+
+    wspSwitch.connect('notify::active', () => {
+        wspSpaceSwitch.sensitive = wspSwitch.active;
+        wspCommandSwitch.sensitive = wspSwitch.active;
+        wspShiftSwitch.sensitive = wspSwitch.active;
+        wspCtrlShiftSwitch.sensitive = wspSwitch.active;
+    });
 
     return optionList;
 }

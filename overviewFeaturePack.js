@@ -54,7 +54,7 @@ function activate() {
     _updateDash();
 
     if (gOptions.get('searchWindowsEnable')) {
-        WindowSearchProvider.enable();
+        WindowSearchProvider.enable(gOptions);
     }
 
     Main.overview.connect('hiding', () => {

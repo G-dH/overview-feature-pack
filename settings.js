@@ -36,6 +36,8 @@ var Options = class Options {
             alwaysShowWindowTitles: ['boolean', 'always-show-window-titles'],
             searchWindowsEnable: ['boolean', 'search-windows-enable'],
             searchWindowsSpaceKey: ['boolean', 'search-windows-space-key'],
+            searchWindowsCommands: ['boolean', 'search-windows-commands'],
+            searchWindowsShiftMoves: ['boolean', 'search-windows-shift-moves'],
         }
         this.cachedOptions = {};
 

@@ -50,5 +50,11 @@
     <key type="b" name="search-windows-space-key">
       <default>true</default>
     </key>
+    <key type="b" name="search-windows-commands">
+      <default>false</default>
+    </key>
+    <key type="b" name="search-windows-shift-moves">
+      <default>false</default>
+    </key>
   </schema>
 </schemalist>
