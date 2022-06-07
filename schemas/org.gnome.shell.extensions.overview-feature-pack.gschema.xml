@@ -56,5 +56,8 @@
     <key type="b" name="search-windows-shift-moves">
       <default>false</default>
     </key>
+    <key type="b" name="search-windows-click-empty-space">
+      <default>true</default>
+    </key>
   </schema>
 </schemalist>

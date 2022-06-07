@@ -621,7 +621,7 @@ function _getDashOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('Highlight App Windows When Hovering Icon'),
+            _('Hovering Icon Highlights App Windows'),
             'When hovering an app icon, all app window previews will show their titles and the recently used window will be marked by green close button.',
             _newSwitch(),
             'dashHoverIconHighlitsWindows'
@@ -642,7 +642,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Show Windows Before Activation'),
-            'if the app you clicked on has more than one window and [no window / recently used window] (depends on the following option) is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.',
+            'if the app you clicked on has more than one window and no [window / recently used window (depends on the following option)] is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.',
             showWindowsBeforeBtn,
             'dashShowWindowsBeforeActivation'
         )
@@ -726,7 +726,7 @@ function _getMiscOptionList() {
     optionList.push(
         _optionsItem(
             _('Space Activates Window Search'),
-            'Pressing the Space bar in the Overview window picker paste "wq: " prefix to the search entry to activate the search and suppress results from other search providers.',
+            'Pressing the Space bar in the Overview window picker pastes "wq: " prefix to the search entry to activate the search and suppress results from other search providers.',
             wspSpaceSwitch,
             'searchWindowsSpaceKey'
         )
@@ -746,7 +746,7 @@ function _getMiscOptionList() {
     optionList.push(
         _optionsItem(
             _('Shift Moves Window to Current Workspace'),
-            'Holding down the Shift key while activating the selected search result, moves the window to the curent workspace.',
+            'Hold down the Shift key while activating the selected search result to move the window to the curent workspace.',
             wspShiftSwitch,
             'searchWindowsShiftMoves'
         )
@@ -759,15 +759,30 @@ function _getMiscOptionList() {
             _('Ctrl+Shift Moves All Windows to Current Workspace'),
             'Hold down the Ctrl and Shift keys while activating the search result to move all found windows to the current workspace and activate the selected window.',
             wspCtrlShiftSwitch,
-            'searchWindowsShiftMoves'
+            'searchWindowsShiftMoves' // this is intentional, activation of one option activates the other
         )
     );
 
-    wspSwitch.connect('notify::active', () => {
+    const wspClickEmptySwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Secondary Click On Workspace Activates Window Search'),
+            'Activate window search by right-clicking on an empty space on the workspace.',
+            wspClickEmptySwitch,
+            'searchWindowsClickEmptySpace'
+        )
+    );
+
+    const _setOptionsSensitivity = () => {
         wspSpaceSwitch.sensitive = wspSwitch.active;
         wspCommandSwitch.sensitive = wspSwitch.active;
         wspShiftSwitch.sensitive = wspSwitch.active;
         wspCtrlShiftSwitch.sensitive = wspSwitch.active;
+        wspClickEmptySwitch.sensitive = wspSwitch.active;
+    };
+    _setOptionsSensitivity();
+    wspSwitch.connect('notify::active', () => {
+        _setOptionsSensitivity();
     });
 
     return optionList;

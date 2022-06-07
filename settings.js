@@ -38,6 +38,7 @@ var Options = class Options {
             searchWindowsSpaceKey: ['boolean', 'search-windows-space-key'],
             searchWindowsCommands: ['boolean', 'search-windows-commands'],
             searchWindowsShiftMoves: ['boolean', 'search-windows-shift-moves'],
+            searchWindowsClickEmptySpace: ['boolean', 'search-windows-click-empty-space']
         }
         this.cachedOptions = {};
 
