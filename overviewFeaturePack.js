@@ -365,7 +365,7 @@ var WindowPreviewOverride = {
             return;
 
         this._overlayShown = true;
-        this._restack();
+        //this._restack();
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
@@ -418,7 +418,7 @@ var WindowPreviewOverride = {
         if (!this._overlayShown)
             return;
         this._overlayShown = false;
-        this._restack();
+        //this._restack();
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
@@ -725,9 +725,10 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                     }*/
                 } else {
                     opacity = othersOpacity;
-                    titleOpacity = gOptions.get('alwaysShowWindowTitles') ? 255 : 0;
+                    titleOpacity = 0;
                 }
 
+                titleOpacity = gOptions.get('alwaysShowWindowTitles') ? 255 : titleOpacity;
                 // If we're supposed to animate and an animation in our direction
                 // is already happening, let that one continue
                 const ongoingTransition = windowPreview._title.get_transition('opacity');
