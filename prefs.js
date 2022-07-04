@@ -11,8 +11,6 @@ const Settings       = Me.imports.settings;
 // gettext
 const _  = Settings._;
 
-const shellVersion = Settings.shellVersion;
-
 // libadwaita is available starting with GNOME Shell 42.
 let Adw = null;
 try { Adw = imports.gi.Adw; } catch (e) {}
@@ -22,20 +20,15 @@ let stackSwitcher;
 let stack;
 let windowWidget;
 
-// conversion of Gtk3 / Gtk4 widgets add methods
-const append = shellVersion < 40 ? 'add' : 'append';
-const set_child = shellVersion < 40 ? 'add' : 'set_child';
-
 const GENERAL_TITLE = _('General');
 const GENERAL_ICON = 'preferences-system-symbolic';
 const DASH_TITLE = _('Dash');
 const DASH_ICON = 'view-app-grid-symbolic';
-const MISC_TITLE = _('Misc');
-const MISC_ICON = 'preferences-other-symbolic';
+const SEARCH_TITLE = _('Search');
+const SEARCH_ICON = 'edit-find-symbolic';
 
-function _newImageFromIconName(name, size = null) {
-    const args = shellVersion >= 40 ? [name] : [name, size];
-    return Gtk.Image.new_from_icon_name(...args);
+function _newImageFromIconName(name) {
+    return Gtk.Image.new_from_icon_name(name);
 }
 
 
@@ -54,14 +47,14 @@ function fillPreferencesWindow(window) {
         title: DASH_TITLE,
         icon_name: DASH_ICON
     });
-    const miscOptionsPage = getAdwPage(_getMiscOptionList(), {
-        title: MISC_TITLE,
-        icon_name: MISC_ICON
+    const searchPage = getAdwPage(_getSearchOptionList(), {
+        title: SEARCH_TITLE,
+        icon_name: SEARCH_ICON
     });
 
     window.add(overviewOptionsPage);
     window.add(dashOptionsPage);
-    window.add(miscOptionsPage);
+    window.add(searchPage);
 
     window.set_search_enabled(true);
 
@@ -70,7 +63,7 @@ function fillPreferencesWindow(window) {
     window.connect('close-request', _onDestroy);
 
     const width = 600;
-    const height = 800;
+    const height = 700;
     window.set_default_size(width, height);
 
     return window;
@@ -98,8 +91,6 @@ function buildPrefsWidget() {
         hexpand: true,
     });
 
-    if (shellVersion < 40) stackSwitcher.homogeneous = true;
-
     const context = stackSwitcher.get_style_context();
     context.add_class('caption');
 
@@ -109,7 +100,7 @@ function buildPrefsWidget() {
 
     stack.add_named(getLegacyPage(_getGeneralOptionList()), 'general');
     stack.add_named(getLegacyPage(_getDashOptionList()), 'dash');
-    stack.add_named(getLegacyPage(_getMiscOptionList()), 'misc');
+    stack.add_named(getLegacyPage(_getSearchOptionList()), 'misc');
 
     const pagesBtns = [
         [new Gtk.Label({ label: GENERAL_TITLE}), _newImageFromIconName(GENERAL_ICON, Gtk.IconSize.BUTTON)],
@@ -123,8 +114,8 @@ function buildPrefsWidget() {
         const icon = pagesBtns[i][1];
         icon.margin_start = 30;
         icon.margin_end = 30;
-        box[append](icon);
-        box[append](pagesBtns[i][0]);
+        box.append(icon);
+        box.append(pagesBtns[i][0]);
         if (stackSwitcher.get_children) {
             stBtn = stackSwitcher.get_children()[i];
             stBtn.add(box);
@@ -138,25 +129,20 @@ function buildPrefsWidget() {
     stack.show_all && stack.show_all();
     stackSwitcher.show_all && stackSwitcher.show_all();
 
-    prefsWidget[prefsWidget.add ? 'add' : 'append'](stack);
+    prefsWidget.append(stack);
     prefsWidget.show_all && prefsWidget.show_all();
 
     prefsWidget.connect('realize', (widget) => {
         const window = widget.get_root ? widget.get_root() : widget.get_toplevel();
         const width = 600;
-        const height = 800;
+        const height = 700;
         window.set_default_size(width, height);
 
         
         const headerbar = window.get_titlebar();
-        if (shellVersion >= 40) {
-            headerbar.title_widget = stackSwitcher;
-        } else {
-            headerbar.custom_title = stackSwitcher;
-        }
+        headerbar.title_widget = stackSwitcher;
 
-        const signal = Gtk.get_major_version() === 3 ? 'destroy' : 'close-request';
-        window.connect(signal, _onDestroy);
+        window.connect('close-request', _onDestroy);
     });
 
     return prefsWidget;
@@ -246,15 +232,15 @@ function getLegacyPage(optionList) {
                 margin_bottom: 2
             });
             lbl.set_markup(option); // option is plain text if item is section title
-            mainBox[append](lbl);
+            mainBox.append(lbl);
             frame = new Gtk.Frame({
                 margin_bottom: 10,
             });
             frameBox = new Gtk.ListBox({
                 selection_mode: null,
             });
-            mainBox[append](frame);
-            frame[set_child](frameBox);
+            mainBox.append(frame);
+            frame.set_child(frameBox);
             continue;
         }
         const grid = new Gtk.Grid({
@@ -272,10 +258,10 @@ function getLegacyPage(optionList) {
             grid.attach(widget, 6, 0, 3, 1);
         }
 
-        frameBox[append](grid);
+        frameBox.append(grid);
     }
 
-    page[set_child](mainBox);
+    page.set_child(mainBox);
     page.show_all && page.show_all();
 
     return page;
@@ -411,12 +397,6 @@ function _newButton() {
 }
 
 function _optionsItem(text, tooltip, widget, variable, options = []) {
-    /*if (widget && gOptions.get(variable) === undefined && variable != 'preset') {
-        throw new Error(
-            `Settings variable ${variable} doesn't exist, check your code dude!`
-        );
-    }*/
-    // item structure: [option(label/caption), widget]
     let item = [];
     let label;
     if (widget) {
@@ -433,7 +413,7 @@ function _optionsItem(text, tooltip, widget, variable, options = []) {
         });
         option.set_markup(text);
 
-        label[append](option);
+        label.append(option);
 
         if (tooltip) {
             const caption = new Gtk.Label({
@@ -445,7 +425,7 @@ function _optionsItem(text, tooltip, widget, variable, options = []) {
             context.add_class('dim-label');
             context.add_class('caption');
             caption.set_text(tooltip);
-            label[append](caption);
+            label.append(caption);
         }
 
     } else {
@@ -540,7 +520,7 @@ function _getGeneralOptionList() {
             _('Shift Reorders Workspace'),
             _('Allows you to reorder the current workspace using Shift + Scroll or Shift + PageUP/PageDown keys.'),
             _newSwitch(),
-            'addReorderWs'
+            'shiftReordersWs'
         )
     );
 
@@ -565,7 +545,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Always Show Window Titles'),
-            null,
+            _('Window titles will always be visible, not only when you hover the mouse pointer over the window preview.'),
             _newSwitch(),
             'alwaysShowWindowTitles'
         )
@@ -622,7 +602,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Hovering Icon Highlights App Windows'),
-            'When hovering an app icon, all app window previews will show their titles and the recently used window will be marked by green close button.',
+            'When hovering an app icon, all app window previews will show their titles and the recently used window will be marked by the close button.',
             _newSwitch(),
             'dashHoverIconHighlitsWindows'
         )
@@ -701,7 +681,7 @@ function _getDashOptionList() {
 }
     //--------------------------------------------------------------------
 
-function _getMiscOptionList() {
+function _getSearchOptionList() {
     const optionList = [];
     // options item format:
     // [text, tooltip, widget, settings-variable, options for combo]

@@ -19,6 +19,7 @@ function enable() {
         700,
         () => {
             OverviewFeaturePack.activate();
+            log(`${Me.metadata.name}: enabled`);
             enableTimeoutId = 0;
             return GLib.SOURCE_REMOVE;
         }
@@ -32,4 +33,5 @@ function disable() {
     }
 
     OverviewFeaturePack.reset();
+    log(`${Me.metadata.name}: disabled`);
 }

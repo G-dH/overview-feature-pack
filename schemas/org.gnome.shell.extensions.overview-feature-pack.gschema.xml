@@ -29,7 +29,7 @@
     <key type="b" name="fullscreen-hot-corner">
       <default>true</default>
     </key>
-    <key type="b" name="add-reorder-ws">
+    <key type="b" name="shift-reorders-ws">
       <default>true</default>
     </key>
     <key type="b" name="hover-activates-window-on-leave">

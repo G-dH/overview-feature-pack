@@ -30,19 +30,16 @@ let _windowPreviewInjections = {};
 let _featurePackOverrides = {};
 let _workspaceInjections = {};
 let _dashRedisplayTimeoutId = 0;
+let _hoverActivatesWindowSigId = 0;
 
 let gOptions;
 
 
 function activate() {
     gOptions = new Settings.Options();
-    gOptions.connect('changed::search-windows-enable', () => {
-        if (gOptions.get('searchWindowsEnable'))
-            WindowSearchProvider.enable(gOptions);
-        else
-            WindowSearchProvider.disable();
-    });
-
+    
+    gOptions.connect('changed', _updateSettings);
+    
     if (gOptions.get('searchWindowsEnable')) {
         WindowSearchProvider.enable(gOptions);
     }
@@ -59,12 +56,7 @@ function activate() {
     _injectWindowPreview();
     _injectWorkspace();
     _updateDash();
-
-    Main.overview.connect('hiding', () => {
-        if (global.windowToActivate) {
-            global.windowToActivate.activate(global.get_current_time());
-        }
-    });
+    _updateSettings();
 }
 
 function reset() {
@@ -105,6 +97,36 @@ function reset() {
 }
 
 //---------------------------------------------------
+
+function _updateSettings(settings, key) {
+    switch (key) {
+    case 'search-windows-enable':
+        if (gOptions.get('searchWindowsEnable'))
+                WindowSearchProvider.enable(gOptions);
+            else
+                WindowSearchProvider.disable();
+        break;
+    case 'hover-activates-window-on-leave':
+        _updateHoverActivatesWindow();
+        break;
+    }
+}
+
+function _updateHoverActivatesWindow() {
+    const state = gOptions.get('hoverActivatesWindowOnLeave');
+    if (state) {
+        if (!_hoverActivatesWindowSigId) {
+            _hoverActivatesWindowSigId = Main.overview.connect('hiding', () => {
+                if (global.windowToActivate) {
+                    global.windowToActivate.activate(global.get_current_time());
+                }
+            });
+        }
+    } else if (_hoverActivatesWindowSigId) {
+        Main.overview.disconnect(_hoverActivatesWindowSigId);
+        _hoverActivatesWindowSigId = 0;
+    }
+}
 
 function _moveDashAppGridIconLeft(reset = false) {
     // move dash app grid icon to the front
@@ -190,7 +212,7 @@ function _injectWorkspace() {
 
 // WorkspacesDisplay
 // add reorder workspace using Shift + (mouse wheel / PageUP/PageDown)
-
+// needed for options shiftReordersWs, spaceActivatesDash, searchWindowsEnable, searchWindowsSpaceKey
 var WorkspacesDisplayOverride = {
     _onScrollEvent: function(actor, event) {
         if (this._swipeTracker.canHandleScrollEvent(event))
@@ -203,7 +225,7 @@ var WorkspacesDisplayOverride = {
             this._getMonitorIndexForEvent(event) != this._primaryIndex)
             return Clutter.EVENT_PROPAGATE;
 
-        if (gOptions.get('addReorderWs') && global.get_pointer()[2] & Clutter.ModifierType.SHIFT_MASK) {
+        if (gOptions.get('shiftReordersWs') && global.get_pointer()[2] & Clutter.ModifierType.SHIFT_MASK) {
             let direction = event.get_scroll_direction();
             if (direction === Clutter.ScrollDirection.UP) {
                 direction = -1;
@@ -280,7 +302,7 @@ var WorkspacesDisplayOverride = {
             // Otherwise it is a workspace index
             ws = workspaceManager.get_workspace_by_index(which);
 
-        if (gOptions.get('addReorderWs') && event.get_state() & Clutter.ModifierType.SHIFT_MASK) {
+        if (gOptions.get('shiftReordersWs') && event.get_state() & Clutter.ModifierType.SHIFT_MASK) {
             let direction;
             if (which === Meta.MotionDirection.UP || which === Meta.MotionDirection.LEFT)
                 direction = -1;
@@ -326,8 +348,10 @@ var HotCornerOverride = {
 function _injectWindowPreview() {
     _windowPreviewInjections['_init'] = _Util.injectToFunction(
         WindowPreview.WindowPreview.prototype, '_init', function() {
-            if (gOptions.get('moveTitlesIntoWindows'))
+            if (gOptions.get('moveTitlesIntoWindows')) {
                 this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE;
+                this.set_child_above_sibling(this._title, null);
+            }
             if (gOptions.get('alwaysShowWindowTitles'))
                 this._title.show();
                 this._title.opacity = 255;
@@ -718,11 +742,11 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                 if (app.get_windows().includes(windowPreview.metaWindow)) {
                     opacity = 255;
                     titleOpacity = othersOpacity === 255 ? 0 : 255;
-                    /*if (windowPreview.metaWindow === appLastUsedWindow) {
+                    if (windowPreview.metaWindow === appLastUsedWindow) {
                         windowPreview._closeButton.show();
-                        windowPreview._closeButton.opacity = 255;
-                        windowPreview._closeButton.set_style('background-color: green');
-                    }*/
+                        windowPreview._closeButton.opacity = opacity;
+                        //windowPreview._closeButton.set_style('background-color: green');
+                    }
                 } else {
                     opacity = othersOpacity;
                     titleOpacity = 0;
@@ -765,60 +789,6 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
 }
 
 // --------------------------------------------------------------------------------------------------------------------
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-function _updateWorkspacesDisplay() {
-    const { initialState, finalState, progress } = this._stateAdjustment.getStateTransitionParams();
-    const { searchActive } = this._searchController;
-
-    const paramsForState = s => {
-        let opacity;
-        switch (s) {
-            case ControlsState.HIDDEN:
-            case ControlsState.WINDOW_PICKER:
-                opacity = 255;
-                break;
-            case ControlsState.APP_GRID:
-                opacity = 0;
-                break;
-            default:
-                opacity = 255;
-                break;
-        }
-        return { opacity };
-    };
-
-    let initialParams = paramsForState(initialState);
-    let finalParams = paramsForState(finalState);
-
-    let opacity = Math.round(Util.lerp(initialParams.opacity, finalParams.opacity, progress));
-
-    let workspacesDisplayVisible = (opacity != 0) && !(searchActive);
-    let params = {
-        opacity: opacity,
-        duration: 0,
-        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-        onComplete: () => {
-            // workspacesDisplay needs to go from screen, otherwise it blocks DND operations within the App Display
-            // but the 'visibile' property ruins transition animation and breakes workspace control
-            // scale_y = 0 works same as visibile = 0 but without collateral damage
-            this._workspacesDisplay.scale_y = (progress == 1 && finalState == ControlsState.APP_GRID) ? 0 : 1;
-            this._workspacesDisplay.reactive = workspacesDisplayVisible;
-            this._workspacesDisplay.setPrimaryWorkspaceVisible(workspacesDisplayVisible);
-            // following changes in which axis will operate overshoot detection which switches appDisplay pages while dragging app icon to vertical
-            // overall orientation of the grid and its pages stays horizontal, global orientation switch is not built-in
-            if (finalState === ControlsState.APP_GRID)
-                Main.overview._overview.controls._appDisplay._orientation = Clutter.Orientation.VERTICAL;
-        }
-    }
-
-    // scale workspaces back to normal size before transition from AppGrid view
-    if (progress < 1 && !this._workspacesDisplay.scale_y) {
-        this._workspacesDisplay.scale_y = 1;
-    }
-
-    this._workspacesDisplay.ease(params);
-}
 
 function _getWindowApp(metaWin) {
     const tracker = Shell.WindowTracker.get_default();

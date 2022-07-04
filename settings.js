@@ -27,7 +27,7 @@ var Options = class Options {
             dashScrollSwitchesAppWindowsWs: ['boolean', 'dash-scroll-switches-app-windows-ws'],
             spaceActivatesDash: ['boolean', 'space-activates-dash'],
             moveTitlesIntoWindows: ['boolean', 'move-titles-into-windows'],
-            addReorderWs: ['boolean', 'add-reorder-ws'],
+            shiftReordersWs: ['boolean', 'shift-reorders-ws'],
             hoverActivatesWindowOnLeave: ['boolean', 'hover-activates-window-on-leave'],
             appMenuMoveAppToWs: ['boolean', 'app-menu-move-app-to-ws'],
             appMenuForceQuit:['boolean', 'app-menu-force-quit'],
