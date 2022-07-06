@@ -1,5 +1,12 @@
-// Overview Feature Pack
-// GPL v3 ©G-dH@Github.com
+/**
+ * OFP - Overview Feature Pack
+ * OverviewFeaturePack
+ *
+ * @author     GdH <G-dH@github.com>
+ * @copyright  2022
+ * @license    GPL-3.0
+ */
+
 'use strict';
 
 const { Clutter, GLib, Meta, Shell, St } = imports.gi;
@@ -37,9 +44,9 @@ let gOptions;
 
 function activate() {
     gOptions = new Settings.Options();
-    
+
     gOptions.connect('changed', _updateSettings);
-    
+
     if (gOptions.get('searchWindowsEnable')) {
         WindowSearchProvider.enable(gOptions);
     }
@@ -504,7 +511,7 @@ var AppIconOverride = {
 
         const currentWS = global.workspace_manager.get_active_workspace();
         const appRecentWorkspace = _getAppRecentWorkspace(this.app);
-        
+
         let targetWindowOnCurrentWs = false;
         if (gOptions.get('dashClickFollowsRecentWindow')) {
             targetWindowOnCurrentWs = appRecentWorkspace === currentWS;
@@ -716,7 +723,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
 
     //const appRecentWorkspace = _getAppRecentWorkspace(app);
     const appLastUsedWindow = _getAppLastUsedWindow(app);
-    
+
     const views = Main.overview._overview.controls._workspacesDisplay._workspacesViews;
     const viewsIter = [views[0]];
     // socondary monitors use different structure

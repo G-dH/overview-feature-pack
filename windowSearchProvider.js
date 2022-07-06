@@ -1,5 +1,12 @@
-// Window Search Provider
-// GPL v3 ©G-dH@Github.com
+/**
+ * OFP - Overview Feature Pack
+ * WindowSearchProvider
+ *
+ * @author     GdH <G-dH@github.com>
+ * @copyright  2022
+ * @license    GPL-3.0
+ */
+
 'use strict';
 
 const { GLib, GObject, Gio, Gtk, Meta, St, Shell } = imports.gi;

@@ -1,5 +1,12 @@
-// Overview Feature Pack
-// GPL v3 ©G-dH@Github.com
+/**
+ * OFP - Overview Feature Pack
+ * Settings
+ *
+ * @author     GdH <G-dH@github.com>
+ * @copyright  2022
+ * @license    GPL-3.0
+ */
+
 'use strict';
 
 const { GLib, Gio } = imports.gi;
