@@ -59,5 +59,14 @@
     <key type="b" name="search-windows-click-empty-space">
       <default>true</default>
     </key>
+    <key type="i" name="show-wst-labels">
+      <default>1</default>
+    </key>
+    <key type="b" name="show-wst-labels-on-hover">
+      <default>true</default>
+    </key>
+    <key type="b" name="show-ws-switcher-bg">
+      <default>true</default>
+    </key>
   </schema>
 </schemalist>

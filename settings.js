@@ -25,6 +25,7 @@ const _schema = 'org.gnome.shell.extensions.overview-feature-pack';
 var Options = class Options {
     constructor() {
         this._gsettings = ExtensionUtils.getSettings(_schema);
+        this._gsettings.connect('changed', this._updateCachedSettings.bind(this));
         this._connectionIds = [];
         this.options = {
             dashShiftClickMovesAppToCurrentWs: ['boolean', 'dash-shift-click-moves-app-to-current-ws'],
@@ -45,11 +46,12 @@ var Options = class Options {
             searchWindowsSpaceKey: ['boolean', 'search-windows-space-key'],
             searchWindowsCommands: ['boolean', 'search-windows-commands'],
             searchWindowsShiftMoves: ['boolean', 'search-windows-shift-moves'],
-            searchWindowsClickEmptySpace: ['boolean', 'search-windows-click-empty-space']
+            searchWindowsClickEmptySpace: ['boolean', 'search-windows-click-empty-space'],
+            showWsTmbLabels: ['int', 'show-wst-labels'],
+            showWsTmbLabelsOnHover: ['boolean', 'show-wst-labels-on-hover'],
+            showWsSwitcherBg: ['boolean', 'show-ws-switcher-bg'],
         }
         this.cachedOptions = {};
-
-        this.connect('changed', this._updateCachedSettings.bind(this));
     }
 
     connect(name, callback) {
@@ -96,18 +98,18 @@ var Options = class Options {
         }
 
         switch (format) {
-            case 'boolean':
-                gSettings.set_boolean(key, value);
-                break;
-            case 'int':
-                gSettings.set_int(key, value);
-                break;
-            case 'string':
-                gSettings.set_string(key, value);
-                break;
-            case 'strv':
-                gSettings.set_strv(key, value);
-                break;
+        case 'boolean':
+            gSettings.set_boolean(key, value);
+            break;
+        case 'int':
+            gSettings.set_int(key, value);
+            break;
+        case 'string':
+            gSettings.set_string(key, value);
+            break;
+        case 'strv':
+            gSettings.set_strv(key, value);
+            break;
         }
     }
 

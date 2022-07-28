@@ -21,6 +21,8 @@ const OverviewControls = imports.ui.overviewControls;
 const WorkspacesView = imports.ui.workspacesView;
 const WindowPreview = imports.ui.windowPreview;
 const Workspace = imports.ui.workspace;
+const WorkspaceThumbnail = imports.ui.workspaceThumbnail;
+const Background = imports.ui.background;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
@@ -58,6 +60,8 @@ function activate() {
     _featurePackOverrides['AppIcon'] = _Util.overrideProto(AppDisplay.AppIcon.prototype, AppIconOverride);
     _featurePackOverrides['HotCorner'] = _Util.overrideProto(Layout.HotCorner.prototype, HotCornerOverride);
     _featurePackOverrides['WindowPreview'] = _Util.overrideProto(WindowPreview.WindowPreview.prototype, WindowPreviewOverride);
+    _featurePackOverrides['WorkspaceThumbnail'] = _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, WorkspaceThumbnailOverride);
+
     Main.layoutManager._updateHotCorners();
     _injectAppIcon();
     _injectWindowPreview();
@@ -87,6 +91,7 @@ function reset() {
     _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, _featurePackOverrides['WorkspacesDisplay']);
     _Util.overrideProto(Layout.HotCorner.prototype, _featurePackOverrides['HotCorner']);
     _Util.overrideProto(WindowPreview.WindowPreview.prototype, _featurePackOverrides['WindowPreview']);
+    _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, _featurePackOverrides['WorkspaceThumbnail']);
     _featurePackOverrides = {};
 
     const removeConnections = true;
@@ -245,6 +250,8 @@ var WorkspacesDisplayOverride = {
 
             if (direction) {
                 _reorderWorkspace(direction);
+                // make all workspaces on primary monitor visible for case the new position is hiden
+                Main.overview._overview._controls._workspacesDisplay._workspacesViews[0]._workspaces.forEach(w => w.visible = true);
                 return Clutter.EVENT_STOP;
             }
         }
@@ -317,6 +324,8 @@ var WorkspacesDisplayOverride = {
                 direction = 1;
             if (direction)
                 _reorderWorkspace(direction);
+                // make all workspaces on primary monitor visible for case the new position is hiden
+                Main.overview._overview._controls._workspacesDisplay._workspacesViews[0]._workspaces.forEach(w => w.visible = true);
                 return Clutter.EVENT_STOP;
         }
 
@@ -587,15 +596,16 @@ var AppIconOverride = {
             }
         }
 
-
-        // once the menu is created, it stays unchanged
+        // once the menu is created, it stays unchanged and we need to modify our items based on current situation
         if (this._addedMenuItems && this._addedMenuItems.length) {
             this._addedMenuItems.forEach(i => i.destroy());
         }
 
-        this._menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
-
         const popupItems =[];
+
+        const separator = new PopupMenu.PopupSeparatorMenuItem();
+        this._menu.addMenuItem(separator);
+
         if (this.app.get_n_windows()) {
             if (gOptions.get('appMenuForceQuit')) {
                 popupItems.push([_('Force Quit'), () => this.app.get_windows()[0].kill()]);
@@ -621,6 +631,7 @@ var AppIconOverride = {
         }
 
         this._addedMenuItems = [];
+        this._addedMenuItems.push(separator);
         popupItems.forEach(i => {
             let item = new PopupMenu.PopupMenuItem(i[0]);
             this._menu.addMenuItem(item);
@@ -793,6 +804,113 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
             });
         });
     });
+}
+
+// WorkspaceThumbnail
+var WorkspaceThumbnailOverride = {
+    after__init: function () {
+        const SHOW_WST_LABELS = gOptions.get('showWsTmbLabels');
+        const SHOW_WST_LABELS_ON_HOVER = true;//gOptions.get('showWsTmbLabelsOnHover');
+        // add workspace thumbnails labels if enabled
+        if (SHOW_WST_LABELS) { // 0 - disable
+            // layout manager allows aligning widget childs
+            this.layout_manager = new Clutter.BinLayout();
+            const wsIndex = this.metaWorkspace.index();
+
+            let label = `${wsIndex + 1}`;
+
+            if (SHOW_WST_LABELS === 2) { // 2 - index + workspace name
+                const settings = ExtensionUtils.getSettings('org.gnome.desktop.wm.preferences');
+                const wsLabels = settings.get_strv('workspace-names');
+                if (wsLabels.length > wsIndex && wsLabels[wsIndex]) {
+                    label += `: ${wsLabels[wsIndex]}`;
+                }
+            } else if (SHOW_WST_LABELS === 3) { // 3- index + app name
+                const metaWin = global.display.get_tab_list(0, this.metaWorkspace).filter(w => w.get_monitor() === this.monitorIndex)[0];
+
+                if (metaWin) {
+                    let tracker = Shell.WindowTracker.get_default();
+                    label += `: ${tracker.get_window_app(metaWin).get_name()}`;
+                }
+            }
+            this._wstLabel = new St.Label({
+                text: label,
+                style_class: 'dash-label',//'window-caption',// 'ws-tmb-label',
+                x_align: Clutter.ActorAlign.CENTER,
+                y_align: Clutter.ActorAlign.END,
+                x_expand: true,
+                y_expand: true,
+            });
+            this._wstLabel.set_style('padding-top: 5px; padding-bottom: 5px;');
+            this._wstLabel._maxOpacity = 255;
+            this._wstLabel.opacity = this._wstLabel._maxOpacity;
+            //this.add_child(this._wstLabel);
+            //this.set_child_above_sibling(this._wstLabel, null);
+            if (SHOW_WST_LABELS_ON_HOVER) {
+                this.reactive = true;
+                this._wstLabel.opacity = 0;
+                Main.layoutManager.addChrome(this._wstLabel);
+                this._wstLabel.hide();
+                this.connect('enter-event', ()=> {
+                    this._wstLabel.show();
+                    let [stageX, stageY] = this.get_transformed_position();
+                    const itemWidth = this.allocation.get_width();
+                    const itemHeight = this.allocation.get_height();
+
+                    const labelWidth = this._wstLabel.get_width();
+                    const labelHeight = this._wstLabel.get_height();
+                    const xOffset = Math.floor((itemWidth - labelWidth) / 2);
+                    let x = Math.clamp(stageX + xOffset, 0, global.stage.width - labelWidth);
+
+                    let node = this._wstLabel.get_theme_node();
+
+                    const yOffset = itemHeight + node.get_length('-y-offset');
+                    let y = stageY + yOffset;
+
+                    this._wstLabel.set_position(x, y);
+
+                    this._wstLabel.ease({
+                        duration: 100,
+                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                        opacity: this._wstLabel._maxOpacity,
+                    });
+                });
+                this.connect('leave-event', ()=> {
+                    this._wstLabel.ease({
+                        duration: 100,
+                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                        opacity: 0,
+                        onComplete: () => this._wstLabel.hide()
+                    })
+                });
+
+                this.connect('destroy', () => {
+                    Main.layoutManager.removeChrome(this._wstLabel);
+                    this._wstLabel.destroy();
+                });
+            }
+        }
+
+        if (!gOptions.get('showWsSwitcherBg'))
+            return;
+
+        this._bgManager = new Background.BackgroundManager({
+            monitorIndex: this.monitorIndex,
+            container: this._viewport,
+            vignette: false,
+            controlPosition: false,
+        });
+
+        this._viewport.set_child_below_sibling(this._bgManager.backgroundActor, null);
+
+        this.connect('destroy', function () {
+            if (this._bgManager)
+                this._bgManager.destroy();
+            this._bgManager = null;
+        }.bind(this));
+
+        this._bgManager.backgroundActor.opacity = 220;
+    }
 }
 
 // --------------------------------------------------------------------------------------------------------------------

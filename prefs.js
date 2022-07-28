@@ -569,6 +569,21 @@ function _getGeneralOptionList() {
 
     optionList.push(
         _optionsItem(
+            _('Show Workspace Label on Hover'),
+            _('Each workspace thumbnail in the workspace switcher can show its index and name (if defined in the system settings) or name of its most recently used app in a caption on mouse hover. '),
+            _newComboBox(),
+            //_newDropDown(),
+            'showWsTmbLabels',
+            [   [_('Disable'), 0],
+                [_('Index'), 1],
+                [_('Index + WS Name'), 2],
+                [_('Index + App Name'), 3],
+            ]
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
             _('Hot Corner'),
         )
     );
