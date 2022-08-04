@@ -727,7 +727,6 @@ function _getDashOptionList() {
 
     return optionList
 }
-    //--------------------------------------------------------------------
 
 //-----------------------------------------------------
 function _getAppGridOptionList() {
@@ -757,10 +756,25 @@ function _getAppGridOptionList() {
 
     optionList.push(
         _optionsItem(
+            _('Content'),
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
             _('Include Dash Items'),
-            'Include favorite / running apps currently present in the Dash.',
+            'Include favorite / running apps currently present in the Dash. This option works only for Alphabetical and By Usage sorting modes, Default mode stays untouched.',
             _newSwitch(),
             'appGridIncludeDash'
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Always Show Full App Names'),
+            'Dont elipsize app names.',
+            _newSwitch(),
+            'appGridFullNames'
         )
     );
 

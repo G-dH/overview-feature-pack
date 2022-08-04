@@ -9,7 +9,7 @@
 
 'use strict';
 
-const { Clutter, GLib, Meta, Shell, St } = imports.gi;
+const { Clutter, GLib, Meta, Shell, St, Pango } = imports.gi;
 const { AppMenu } = imports.ui.appMenu;
 const PopupMenu = imports.ui.popupMenu;
 const BoxPointer = imports.ui.boxpointer;
@@ -39,6 +39,7 @@ let _appIconInjections = {};
 let _windowPreviewInjections = {};
 let _featurePackOverrides = {};
 let _workspaceInjections = {};
+//let _appViewItemInjections = {};
 let _dashRedisplayTimeoutId = 0;
 let _hoverActivatesWindowSigId = 0;
 let _appSystemStateSigId = 0;
@@ -68,6 +69,7 @@ let WS_TMB_HOVER_SWITCH;
 let SHOW_WST_LABELS;
 let APP_GRID_ORDER;
 let APP_GRID_FAV_RUN;
+let APP_GRID_FULL_NAMES;
 
 let gOptions;
 
@@ -143,14 +145,20 @@ function _updateSettings(settings, key) {
     APP_GRID_ORDER = gOptions.get('appGridOrder', true);
     APP_GRID_FAV_RUN = gOptions.get('appGridIncludeDash', true);
 
+    APP_GRID_FULL_NAMES = gOptions.get('appGridFullNames', true);
+
 
     _updateWorkspacesDisplay();
     _updateWindowPreview();
     _updateWorkspaceThumbnail();
     _updateAppIcon();
+    _updateAppViewItem();
     _updateAppGrid();
     _updateHotCorner();
     _updateWindowSearchProvider();
+
+    // update app icon labels in case APP_GRID_FULL_NAMES changed
+    Main.overview._overview._controls._appDisplay._orderedItems.forEach(icon => icon._updateMultiline());
 }
 
 function _updateWindowSearchProvider(reset = false) {
@@ -205,7 +213,7 @@ function _updateAppIcon(reset = false) {
         _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
     }
 
-    if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS)) {
+    if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS || APP_GRID_FULL_NAMES)) {
         _injectAppIcon();
         //reset dash icons
         _updateDash(true);
@@ -269,6 +277,14 @@ function _updateAppGrid(reset = false) {
         AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
     }
     Main.overview._overview._controls._appDisplay._redisplay();
+}
+
+function _updateAppViewItem(reset = false) {
+    if (!reset && APP_GRID_FULL_NAMES) {
+        _featurePackOverrides['AppViewItem'] = _Util.overrideProto(AppDisplay.AppViewItem.prototype, AppViewItemOverride);
+    } else {
+        _Util.overrideProto(AppDisplay.AppViewItem.prototype, _featurePackOverrides['AppViewItem']);
+    }
 }
 
 function _updateHoverActivatesWindow(reset = false) {
@@ -370,7 +386,7 @@ function _injectWorkspace() {
 // WorkspacesDisplay
 // add reorder workspace using Shift + (mouse wheel / PageUP/PageDown)
 // needed for options shiftReordersWs, spaceActivatesDash, searchWindowsEnable, searchWindowsSpaceKey
-var WorkspacesDisplayOverride = {
+let WorkspacesDisplayOverride = {
     _onScrollEvent: function(actor, event) {
         if (this._swipeTracker.canHandleScrollEvent(event))
             return Clutter.EVENT_PROPAGATE;
@@ -492,7 +508,7 @@ function _reorderWorkspace(direction = 0) {
 
 //-------------- layout ---------------------------------------------------
 
-var HotCornerOverride = {
+let HotCornerOverride = {
     _toggleOverview: function(){
         if (!FULLSCREEN_HOT_CORNER && this._monitor.inFullscreen && !Main.overview.visible)
             return;
@@ -520,7 +536,7 @@ function _injectWindowPreview() {
     );
 }
 // add fading in/out window title for option always show titles
-var WindowPreviewOverride = {
+let WindowPreviewOverride = {
     _updateIconScale: function() {
         const { ControlsState } = OverviewControls;
         const { currentState, initialState, finalState } =
@@ -650,14 +666,24 @@ var WindowPreviewOverride = {
 }
 
 //----- AppIcon -----------------------------------------------------------------------
-
 function _injectAppIcon() {
     _appIconInjections['_init'] = _Util.injectToFunction(
-        AppDisplay.AppIcon.prototype, '_init', _connectAppIconScrollEnterLeave
+        AppDisplay.AppIcon.prototype, '_init', function() {
+            if (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS)
+                _connectAppIconScrollEnterLeave(null, null, this);
+            if (APP_GRID_FULL_NAMES && this.icon.label) {
+                const clutterText = this.icon.label.clutterText;
+                clutterText.set({
+                    line_wrap: true,
+                    line_wrap_mode: Pango.WrapMode.WORD_CHAR,
+                    ellipsize: Pango.EllipsizeMode.NONE,
+                });
+            }
+        }
     );
 }
 
-var AppIconOverride = {
+let AppIconOverride = {
     activate: function(button) {
         let event = Clutter.get_current_event();
         let modifiers = event ? event.get_state() : 0;
@@ -802,7 +828,7 @@ var AppIconOverride = {
     }
 }
 
-var AppDisplayOverride = {
+let AppDisplayOverride = {
     _loadApps: function() {
         let appIcons = [];
         this._appInfoList = Shell.AppSystem.get_default().get_installed().filter(appInfo => {
@@ -860,7 +886,7 @@ var AppDisplayOverride = {
     },
 }
 
-var BaseAppViewOverride = {
+let BaseAppViewOverride = {
     _redisplay: function() {
         let oldApps = this._orderedItems.slice();
         let oldAppIds = oldApps.map(icon => icon.id);
@@ -966,6 +992,37 @@ function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
         // activate app's workspace
         // and hide windows of other apps
     });
+}
+
+let AppViewItemOverride = {
+    _updateMultiline() {
+        if (!this._expandTitleOnHover || !this.icon.label)
+            return;
+
+        const { label } = this.icon;
+        const { clutterText } = label;
+        const layout = clutterText.get_layout();
+        if (!layout.is_wrapped() && !layout.is_ellipsized())
+            return;
+
+        label.remove_transition('allocation');
+
+        const id = label.connect('notify::allocation', () => {
+            label.restore_easing_state();
+            label.disconnect(id);
+        });
+
+        const expand = APP_GRID_FULL_NAMES || this._forcedHighlight || this.hover || this.has_key_focus();
+        label.save_easing_state();
+        label.set_easing_duration(expand
+            ? AppDisplay.APP_ICON_TITLE_EXPAND_TIME
+            : AppDisplay.APP_ICON_TITLE_COLLAPSE_TIME);
+        clutterText.set({
+            line_wrap: expand,
+            line_wrap_mode: expand ? Pango.WrapMode.WORD_CHAR : Pango.WrapMode.NONE,
+            ellipsize: expand ? Pango.EllipsizeMode.NONE : Pango.EllipsizeMode.END,
+        });
+    }
 }
 
 function _highlightMyWindows (delegate, app, othersOpacity = 50) {
@@ -1075,7 +1132,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
 }
 
 // WorkspaceThumbnail
-var WorkspaceThumbnailOverride = {
+let WorkspaceThumbnailOverride = {
     after__init: function () {
         // add workspace thumbnails labels if enabled
         if (SHOW_WST_LABELS) { // 0 - disable
@@ -1125,7 +1182,7 @@ var WorkspaceThumbnailOverride = {
                     const itemHeight = this.allocation.get_height();
 
                     const labelWidth = this._wstLabel.get_width();
-                    const labelHeight = this._wstLabel.get_height();
+                    //const labelHeight = this._wstLabel.get_height();
                     const xOffset = Math.floor((itemWidth - labelWidth) / 2);
                     let x = Math.clamp(stageX + xOffset, 0, global.stage.width - labelWidth);
 
@@ -1151,10 +1208,6 @@ var WorkspaceThumbnailOverride = {
                         onComplete: () => this._wstLabel.hide()
                     })
                 });
-
-                /*this.connect('destroy', () => {
-                    this._wstLabel.destroy();
-                });*/
             }
         }
 

@@ -54,6 +54,7 @@ var Options = class Options {
             wsTmbSwitchOnHover: ['boolean', 'ws-tmb-switch-on-hover'],
             appGridOrder: ['int', 'app-grid-order'],
             appGridIncludeDash: ['boolean', 'app-grid-fav-run'],
+            appGridFullNames: ['boolean', 'app-grid-full-names']
         }
         this.cachedOptions = {};
     }

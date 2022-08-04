@@ -144,7 +144,7 @@ const closeAllResultsRegex = /^\/xa!$/;
 const moveToWsRegex = /^\/m[0-9]+$/;
 const moveAllToWsRegex = /^\/ma[0-9]+$/;
 
-var WindowSearchProvider = class WindowSearchProvider {
+let WindowSearchProvider = class WindowSearchProvider {
     constructor() {
         this.appInfo = Gio.AppInfo.create_from_commandline('true', 'Open Windows', null);
         this.appInfo.get_description = () => 'List of open windows';
