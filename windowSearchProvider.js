@@ -108,6 +108,21 @@ function fuzzyMatch(term, text) {
     return matches.reduce((r, p) => r + p) - matches.length * matches[0] + matches[0];
 }
 
+function strictMatch(term, text) {
+    // remove diacritics and accents from letters
+    let s = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    let p = term.toLowerCase();
+    let ps = p.split(/ +/);
+
+    // allows to use multiple exact paterns separated by sa pace in arbitrary order
+    for (let w of ps) {
+        if (!s.match(w)) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 function makeResult(window, i) {
     const app = Shell.WindowTracker.get_default().get_window_app(window);
     const appName = app ? app.get_name() : 'Unknown';
@@ -190,7 +205,11 @@ var WindowSearchProvider = class WindowSearchProvider {
         const results = [];
         let m;
         for (let key in candidates) {
-            m = fuzzyMatch(term, candidates[key].name);
+            if (gOptions.get('searchWindowsFuzzy')) {
+                m = fuzzyMatch(term, candidates[key].name);
+            } else {
+                m = strictMatch(term, candidates[key].name);
+            }
             if (m !== -1) {
                 results.push({ weight: m, id: key });
             }
@@ -205,7 +224,7 @@ var WindowSearchProvider = class WindowSearchProvider {
         this.resultIds = results.map((item) => item.id);
         return this.resultIds;
     }
-    
+
     getResultMetas (resultIds, callback) {
         const metas = resultIds.map((id) => this.getResultMeta(id));
         callback(metas);
@@ -303,7 +322,7 @@ var WindowSearchProvider = class WindowSearchProvider {
         //return results.slice(0, maxResults);
         return results;
     }
-    
+
     getSubsearchResultSet (previousResults, terms, callback, cancellable) {
         // if we return previous results, quick typers get non-actual results
         callback(this._getResultSet(terms));

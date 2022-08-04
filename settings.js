@@ -47,9 +47,13 @@ var Options = class Options {
             searchWindowsCommands: ['boolean', 'search-windows-commands'],
             searchWindowsShiftMoves: ['boolean', 'search-windows-shift-moves'],
             searchWindowsClickEmptySpace: ['boolean', 'search-windows-click-empty-space'],
+            searchWindowsFuzzy: ['boolean', 'search-windows-fuzzy'],
             showWsTmbLabels: ['int', 'show-wst-labels'],
             showWsTmbLabelsOnHover: ['boolean', 'show-wst-labels-on-hover'],
             showWsSwitcherBg: ['boolean', 'show-ws-switcher-bg'],
+            wsTmbSwitchOnHover: ['boolean', 'ws-tmb-switch-on-hover'],
+            appGridOrder: ['int', 'app-grid-order'],
+            appGridIncludeDash: ['boolean', 'app-grid-fav-run'],
         }
         this.cachedOptions = {};
     }

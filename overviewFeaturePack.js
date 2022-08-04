@@ -23,6 +23,7 @@ const WindowPreview = imports.ui.windowPreview;
 const Workspace = imports.ui.workspace;
 const WorkspaceThumbnail = imports.ui.workspaceThumbnail;
 const Background = imports.ui.background;
+const DND = imports.ui.dnd;
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
@@ -40,6 +41,33 @@ let _featurePackOverrides = {};
 let _workspaceInjections = {};
 let _dashRedisplayTimeoutId = 0;
 let _hoverActivatesWindowSigId = 0;
+let _appSystemStateSigId = 0;
+let _origAppDisplayAcceptDrop;
+let _origAppViewItemHandleDragOver;
+let _origAppViewItemAcceptDrop;
+
+let SEARCH_WINDOWS_ENABLED;
+let SEARCH_WINDOWS_SPACE;
+let SEARCH_WIN_CLICK_EMPTY;
+let SPACE_ACTIVATES_DASH;
+let SHIFT_REORDERS_WS;
+let APP_MENU_MV_TO_WS;
+let APP_MENU_CLOSE_WS;
+let APP_MENU_FORCE_QUIT;
+let DASH_SHIFT_CLICK_MV;
+let DASH_SHOW_WINS_BEFORE;
+let DASH_FOLLOW_RECENT_WIN;
+let DASH_SCROLL_SWITCH_APP_WS;
+let DASH_HOVER_HIGHLIGHT_WINS;
+let FULLSCREEN_HOT_CORNER;
+let HOVER_ACTIVATES_ON_LEAVE;
+let ALWAYS_SHOW_WIN_TITLES;
+let MOVE_WIN_TITLES
+let SHOW_WS_TMB_BG;
+let WS_TMB_HOVER_SWITCH;
+let SHOW_WST_LABELS;
+let APP_GRID_ORDER;
+let APP_GRID_FAV_RUN;
 
 let gOptions;
 
@@ -49,24 +77,6 @@ function activate() {
 
     gOptions.connect('changed', _updateSettings);
 
-    if (gOptions.get('searchWindowsEnable')) {
-        WindowSearchProvider.enable(gOptions);
-    }
-
-    if (Object.keys(_featurePackOverrides).length != 0)
-        reset();
-
-    _featurePackOverrides['WorkspacesDisplay'] = _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, WorkspacesDisplayOverride);
-    _featurePackOverrides['AppIcon'] = _Util.overrideProto(AppDisplay.AppIcon.prototype, AppIconOverride);
-    _featurePackOverrides['HotCorner'] = _Util.overrideProto(Layout.HotCorner.prototype, HotCornerOverride);
-    _featurePackOverrides['WindowPreview'] = _Util.overrideProto(WindowPreview.WindowPreview.prototype, WindowPreviewOverride);
-    _featurePackOverrides['WorkspaceThumbnail'] = _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, WorkspaceThumbnailOverride);
-
-    Main.layoutManager._updateHotCorners();
-    _injectAppIcon();
-    _injectWindowPreview();
-    _injectWorkspace();
-    _updateDash();
     _updateSettings();
 }
 
@@ -74,35 +84,25 @@ function reset() {
     if (!gOptions)
         return;
 
-    for (let name in _appIconInjections) {
-        _Util.removeInjection(AppDisplay.AppIcon.prototype, _appIconInjections, name);
-    }
-    _appIconInjections = {};
+    const reset = true;
+    _updateAppIcon(reset);
+    _updateHotCorner(reset);
+    _updateWindowPreview(reset);
+    _updateWorkspaceThumbnail(reset);
+    _updateWorkspacesDisplay(reset);
+    _updateAppGrid(reset);
+    _updateWindowSearchProvider(reset);
+    _moveDashShowAppsIconLeft(reset);
+    _updateDash(reset);
+    _updateAppGrid(reset);
+    _updateWindowSearchProvider(reset);
 
-    for (let name in _windowPreviewInjections) {
-        _Util.removeInjection(WindowPreview.WindowPreview.prototype, _windowPreviewInjections, name);
-    }
-
-    for (let name in _workspaceInjections) {
-        _Util.removeInjection(Workspace.Workspace.prototype, _workspaceInjections, name);
-    }
-
-    _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
-    _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, _featurePackOverrides['WorkspacesDisplay']);
-    _Util.overrideProto(Layout.HotCorner.prototype, _featurePackOverrides['HotCorner']);
-    _Util.overrideProto(WindowPreview.WindowPreview.prototype, _featurePackOverrides['WindowPreview']);
-    _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, _featurePackOverrides['WorkspaceThumbnail']);
     _featurePackOverrides = {};
-
-    const removeConnections = true;
-    _updateDash(removeConnections);
 
     if (_dashRedisplayTimeoutId) {
         GLib.source_remove(_dashRedisplayTimeoutId);
         _dashRedisplayTimeoutId = 0;
     }
-
-    WindowSearchProvider.disable();
 
     gOptions.destroy();
     gOptions = null;
@@ -111,22 +111,169 @@ function reset() {
 //---------------------------------------------------
 
 function _updateSettings(settings, key) {
-    switch (key) {
-    case 'search-windows-enable':
-        if (gOptions.get('searchWindowsEnable'))
-                WindowSearchProvider.enable(gOptions);
-            else
-                WindowSearchProvider.disable();
-        break;
-    case 'hover-activates-window-on-leave':
-        _updateHoverActivatesWindow();
-        break;
+    SEARCH_WINDOWS_ENABLED = gOptions.get('searchWindowsEnable', true);
+    SEARCH_WINDOWS_SPACE = gOptions.get('searchWindowsSpaceKey', true);
+    SPACE_ACTIVATES_DASH = gOptions.get('spaceActivatesDash', true);
+    SHIFT_REORDERS_WS = gOptions.get('shiftReordersWs', true);
+
+    SEARCH_WIN_CLICK_EMPTY = gOptions.get('searchWindowsClickEmptySpace', true);
+
+    APP_MENU_MV_TO_WS = gOptions.get('appMenuMoveAppToWs', true);
+    APP_MENU_CLOSE_WS = gOptions.get('appMenuCloseWindowsOnCurrentWs', true);
+    APP_MENU_FORCE_QUIT = gOptions.get('appMenuForceQuit', true);
+    DASH_SHIFT_CLICK_MV = gOptions.get('dashShiftClickMovesAppToCurrentWs', true);
+    DASH_SHOW_WINS_BEFORE = gOptions.get('dashShowWindowsBeforeActivation', true);
+    DASH_FOLLOW_RECENT_WIN = gOptions.get('dashClickFollowsRecentWindow', true);
+
+    DASH_SCROLL_SWITCH_APP_WS = gOptions.get('dashScrollSwitchesAppWindowsWs', true);
+
+    DASH_HOVER_HIGHLIGHT_WINS = gOptions.get('dashHoverIconHighlitsWindows', true);
+
+    FULLSCREEN_HOT_CORNER = gOptions.get('fullscreenHotCorner', true);
+
+    HOVER_ACTIVATES_ON_LEAVE = gOptions.get('hoverActivatesWindowOnLeave', true);
+    ALWAYS_SHOW_WIN_TITLES = gOptions.get('alwaysShowWindowTitles', true);
+
+    MOVE_WIN_TITLES = gOptions.get('moveTitlesIntoWindows', true);
+
+    SHOW_WS_TMB_BG = gOptions.get('showWsSwitcherBg', true);
+    WS_TMB_HOVER_SWITCH = gOptions.get('wsTmbSwitchOnHover', true);
+    SHOW_WST_LABELS = gOptions.get('showWsTmbLabels', true);
+
+    APP_GRID_ORDER = gOptions.get('appGridOrder', true);
+    APP_GRID_FAV_RUN = gOptions.get('appGridIncludeDash', true);
+
+
+    _updateWorkspacesDisplay();
+    _updateWindowPreview();
+    _updateWorkspaceThumbnail();
+    _updateAppIcon();
+    _updateAppGrid();
+    _updateHotCorner();
+    _updateWindowSearchProvider();
+}
+
+function _updateWindowSearchProvider(reset = false) {
+    if (!reset && SEARCH_WINDOWS_ENABLED) {
+        WindowSearchProvider.enable(gOptions);
+    } else {
+        WindowSearchProvider.disable();
     }
 }
 
-function _updateHoverActivatesWindow() {
-    const state = gOptions.get('hoverActivatesWindowOnLeave');
-    if (state) {
+function _updateWorkspacesDisplay(reset = false) {
+    if (!reset && ((SEARCH_WINDOWS_ENABLED && SEARCH_WINDOWS_SPACE) || SPACE_ACTIVATES_DASH || SHIFT_REORDERS_WS)) {
+        _featurePackOverrides['WorkspacesDisplay'] = _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, WorkspacesDisplayOverride);
+    } else if (_featurePackOverrides['WorkspacesDisplay']) {
+        _Util.overrideProto(WorkspacesView.WorkspacesDisplay.prototype, _featurePackOverrides['WorkspacesDisplay']);
+    }
+}
+
+function _updateWorkspace(reset = false) {
+    if (!reset && SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_EMPTY) {
+        _injectWorkspace();
+    } else {
+        for (let name in _workspaceInjections) {
+            _Util.removeInjection(Workspace.Workspace.prototype, _workspaceInjections, name);
+        }
+        _workspaceInjections = {};
+    }
+}
+
+function _updateWindowPreview(reset = false) {
+    if (!reset && (ALWAYS_SHOW_WIN_TITLES || HOVER_ACTIVATES_ON_LEAVE)) {
+        _featurePackOverrides['WindowPreview'] = _Util.overrideProto(WindowPreview.WindowPreview.prototype, WindowPreviewOverride);
+        _updateHoverActivatesWindow();
+    } else if (_featurePackOverrides['WindowPreview']) {
+        _Util.overrideProto(WindowPreview.WindowPreview.prototype, _featurePackOverrides['WindowPreview']);
+    }
+
+    if (!reset && (MOVE_WIN_TITLES || ALWAYS_SHOW_WIN_TITLES)) {
+        _injectWindowPreview();
+    } else {
+        for (let name in _windowPreviewInjections) {
+            _Util.removeInjection(WindowPreview.WindowPreview.prototype, _windowPreviewInjections, name);
+        }
+        _windowPreviewInjections = {};
+    }
+}
+
+function _updateAppIcon(reset = false) {
+    if (!reset && (APP_MENU_MV_TO_WS || APP_MENU_CLOSE_WS || APP_MENU_FORCE_QUIT || DASH_SHIFT_CLICK_MV || DASH_SHOW_WINS_BEFORE || DASH_FOLLOW_RECENT_WIN)) {
+        _featurePackOverrides['AppIcon'] = _Util.overrideProto(AppDisplay.AppIcon.prototype, AppIconOverride);
+    } else if (_featurePackOverrides['AppIcon']) {
+        _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
+    }
+
+    if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS)) {
+        _injectAppIcon();
+        //reset dash icons
+        _updateDash(true);
+        _updateDash();
+    } else {
+        for (let name in _appIconInjections) {
+            _Util.removeInjection(AppDisplay.AppIcon.prototype, _appIconInjections, name);
+            //reset dash icons
+            _updateDash(true);
+        }
+        _appIconInjections = {};
+    }
+}
+
+function _updateWorkspaceThumbnail(reset = false) {
+    if (!reset && (WS_TMB_HOVER_SWITCH || SHOW_WST_LABELS || SHOW_WS_TMB_BG)) {
+        _featurePackOverrides['WorkspaceThumbnail'] = _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, WorkspaceThumbnailOverride);
+    } else if (_featurePackOverrides['WorkspaceThumbnail']) {
+        _Util.overrideProto(WorkspaceThumbnail.WorkspaceThumbnail.prototype, _featurePackOverrides['WorkspaceThumbnail']);
+    }
+}
+
+function _updateHotCorner(reset = false) {
+    if (!reset && FULLSCREEN_HOT_CORNER) {
+        _featurePackOverrides['HotCorner'] = _Util.overrideProto(Layout.HotCorner.prototype, HotCornerOverride);
+    } else if (_featurePackOverrides['HotCorner']) {
+        _Util.overrideProto(Layout.HotCorner.prototype, _featurePackOverrides['HotCorner']);
+    }
+
+    Main.layoutManager._updateHotCorners();
+}
+
+function _updateAppGrid(reset = false) {
+    const mode = APP_GRID_ORDER;
+    if (mode === 0 || reset) {
+        _Util.overrideProto(AppDisplay.AppDisplay.prototype, _featurePackOverrides['AppDisplay']);
+        _Util.overrideProto(AppDisplay.BaseAppView.prototype, _featurePackOverrides['BaseAppView']);
+        if (_appSystemStateSigId) {
+            Shell.AppSystem.get_default().disconnect(_appSystemStateSigId);
+            _appSystemStateSigId = 0;
+        }
+        if (_origAppDisplayAcceptDrop)
+            AppDisplay.AppDisplay.prototype.acceptDrop = _origAppDisplayAcceptDrop;
+        if (_origAppViewItemHandleDragOver)
+            AppDisplay.AppViewItem.prototype.handleDragOver = _origAppViewItemHandleDragOver;
+        if (_origAppViewItemAcceptDrop)
+            AppDisplay.AppViewItem.prototype.acceptDrop = _origAppViewItemAcceptDrop;
+
+    } else if (!_appSystemStateSigId) {
+        _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
+        _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
+        _appSystemStateSigId = Shell.AppSystem.get_default().connect('app-state-changed', () => Main.overview._overview._controls._appDisplay._redisplay());
+
+        // deny dnd from dash to appgrid
+        _origAppDisplayAcceptDrop = AppDisplay.AppDisplay.prototype.acceptDrop;
+        AppDisplay.AppDisplay.prototype.acceptDrop = function() { return false; };
+        // deny creating folders by dnd on other icon
+        _origAppViewItemHandleDragOver = AppDisplay.AppViewItem.prototype.handleDragOver;
+        _origAppViewItemAcceptDrop = AppDisplay.AppViewItem.prototype.acceptDrop;
+        AppDisplay.AppViewItem.prototype.handleDragOver = () => DND.DragMotionResult.NO_DROP;
+        AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
+    }
+    Main.overview._overview._controls._appDisplay._redisplay();
+}
+
+function _updateHoverActivatesWindow(reset = false) {
+    const state = HOVER_ACTIVATES_ON_LEAVE;
+    if (!reset && state) {
         if (!_hoverActivatesWindowSigId) {
             _hoverActivatesWindowSigId = Main.overview.connect('hiding', () => {
                 if (global.windowToActivate) {
@@ -140,17 +287,13 @@ function _updateHoverActivatesWindow() {
     }
 }
 
-function _moveDashAppGridIconLeft(reset = false) {
+function _moveDashShowAppsIconLeft(reset = false) {
     // move dash app grid icon to the front
     const dash = Main.overview.dash;
-    let target;
     if (reset)
-        target = dash._showAppsIcon;
+        dash._dashContainer.set_child_at_index(dash._showAppsIcon, 1);
     else
-        target = dash._box;
-    const container = dash._dashContainer;
-    container.remove_actor(target);
-    container.add_actor(target);
+        dash._dashContainer.set_child_at_index(dash._showAppsIcon, 0);
 }
 
 function _updateDash(remove = false) {
@@ -174,7 +317,7 @@ function _updateDash(remove = false) {
                 appIcon.disconnect(appIcon._leaveConnectionID);
                 appIcon._leaveConnectionID = 0;
             }
-        } else if (appIcon && !appIcon._scrollConnectionID) {
+        } else if (DASH_HOVER_HIGHLIGHT_WINS && appIcon && !appIcon._scrollConnectionID) {
             _connectAppIconScrollEnterLeave(null, null, appIcon);
         }
     });
@@ -191,6 +334,8 @@ function _updateDash(remove = false) {
     );
 }
 
+//***********************************************************************************/
+
 function _activateWindowSearchProvider() {
     const prefix = _('wq: ');
     const position = prefix.length;
@@ -205,10 +350,10 @@ function _activateWindowSearchProvider() {
 function _injectWorkspace() {
     _workspaceInjections['_init'] = _Util.injectToFunction(
         Workspace.Workspace.prototype, '_init', function() {
-            if (gOptions.get('searchWindowsEnable') && gOptions.get('searchWindowsClickEmptySpace')) {
+            if (SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_EMPTY) {
                 const clickAction2 = new Clutter.ClickAction();
                 clickAction2.connect('clicked', action => {
-                    if (gOptions.get('searchWindowsEnable') && gOptions.get('searchWindowsClickEmptySpace')) {
+                    if (SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_EMPTY) {
                         // Activate Window Search
                         if (action.get_button() === Clutter.BUTTON_SECONDARY) {
                             _activateWindowSearchProvider();
@@ -237,7 +382,7 @@ var WorkspacesDisplayOverride = {
             this._getMonitorIndexForEvent(event) != this._primaryIndex)
             return Clutter.EVENT_PROPAGATE;
 
-        if (gOptions.get('shiftReordersWs') && global.get_pointer()[2] & Clutter.ModifierType.SHIFT_MASK) {
+        if (SHIFT_REORDERS_WS && global.get_pointer()[2] & Clutter.ModifierType.SHIFT_MASK) {
             let direction = event.get_scroll_direction();
             if (direction === Clutter.ScrollDirection.UP) {
                 direction = -1;
@@ -297,9 +442,9 @@ var WorkspacesDisplayOverride = {
             which = workspaceManager.n_workspaces - 1;
             break;
         case Clutter.KEY_space:
-            if (isCtrlPressed && gOptions.get('spaceActivatesDash')) {
+            if (isCtrlPressed && SPACE_ACTIVATES_DASH) {
                 Main.ctrlAltTabManager._items.forEach(i => {if (i.sortGroup === 1 && i.name === 'Dash') Main.ctrlAltTabManager.focusGroup(i)});
-            } else if (gOptions.get('searchWindowsEnable') && gOptions.get('searchWindowsSpaceKey')) {
+            } else if (SEARCH_WINDOWS_ENABLED && SEARCH_WINDOWS_SPACE) {
                 _activateWindowSearchProvider();
             }
             return Clutter.EVENT_STOP;
@@ -316,7 +461,7 @@ var WorkspacesDisplayOverride = {
             // Otherwise it is a workspace index
             ws = workspaceManager.get_workspace_by_index(which);
 
-        if (gOptions.get('shiftReordersWs') && event.get_state() & Clutter.ModifierType.SHIFT_MASK) {
+        if (SHIFT_REORDERS_WS && event.get_state() & Clutter.ModifierType.SHIFT_MASK) {
             let direction;
             if (which === Meta.MotionDirection.UP || which === Meta.MotionDirection.LEFT)
                 direction = -1;
@@ -349,7 +494,7 @@ function _reorderWorkspace(direction = 0) {
 
 var HotCornerOverride = {
     _toggleOverview: function(){
-        if (!gOptions.get('fullscreenHotCorner') && this._monitor.inFullscreen && !Main.overview.visible)
+        if (!FULLSCREEN_HOT_CORNER && this._monitor.inFullscreen && !Main.overview.visible)
             return;
         if (Main.overview.shouldToggleByCornerOrButton()) {
             Main.overview.toggle();
@@ -364,11 +509,11 @@ var HotCornerOverride = {
 function _injectWindowPreview() {
     _windowPreviewInjections['_init'] = _Util.injectToFunction(
         WindowPreview.WindowPreview.prototype, '_init', function() {
-            if (gOptions.get('moveTitlesIntoWindows')) {
-                this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE;
+            if (MOVE_WIN_TITLES) {
+                this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE * (this._icon.visible ? 1 : 0.5);
                 this.set_child_above_sibling(this._title, null);
             }
-            if (gOptions.get('alwaysShowWindowTitles'))
+            if (ALWAYS_SHOW_WIN_TITLES)
                 this._title.show();
                 this._title.opacity = 255;
         }
@@ -390,8 +535,13 @@ var WindowPreviewOverride = {
             scale_x: scale,
             scale_y: scale,
         });
-        if (gOptions.get('alwaysShowWindowTitles')) {
+        if (ALWAYS_SHOW_WIN_TITLES) {
             this._title.set({
+                opacity: scale * 255
+            });
+        }
+        if (DASH_HOVER_HIGHLIGHT_WINS) {
+            this._closeButton.set({
                 opacity: scale * 255
             });
         }
@@ -419,7 +569,7 @@ var WindowPreviewOverride = {
             ? [this._closeButton]
             : [];
 
-        if (!gOptions.get('alwaysShowWindowTitles')) {
+        if (!ALWAYS_SHOW_WIN_TITLES) {
             toShow.push(this._title);
         }
 
@@ -448,7 +598,7 @@ var WindowPreviewOverride = {
 
         this.emit('show-chrome');
 
-        if (gOptions.get('hoverActivatesWindowOnLeave') && Main.overview._shown) {
+        if (HOVER_ACTIVATES_ON_LEAVE && Main.overview._shown) {
             this._focusWindowSet = true;
             global.windowToActivate = this.metaWindow;
         }
@@ -470,7 +620,7 @@ var WindowPreviewOverride = {
 
         const toHide = [this._closeButton];
 
-        if (!gOptions.get('alwaysShowWindowTitles')) {
+        if (!ALWAYS_SHOW_WIN_TITLES) {
             toHide.push(this._title);
         }
         toHide.forEach(a => {
@@ -492,7 +642,7 @@ var WindowPreviewOverride = {
             });
         }
 
-        if (gOptions.get('hoverActivatesWindowOnLeave') && this._focusWindowSet) {
+        if (HOVER_ACTIVATES_ON_LEAVE && this._focusWindowSet) {
             this._focusWindowSet = false;
             global.windowToActivate = null;
         }
@@ -522,7 +672,7 @@ var AppIconOverride = {
         const appRecentWorkspace = _getAppRecentWorkspace(this.app);
 
         let targetWindowOnCurrentWs = false;
-        if (gOptions.get('dashClickFollowsRecentWindow')) {
+        if (DASH_FOLLOW_RECENT_WIN) {
             targetWindowOnCurrentWs = appRecentWorkspace === currentWS;
         } else {
             this.app.get_windows().forEach(
@@ -537,14 +687,14 @@ var AppIconOverride = {
             this.app.open_new_window(-1);
         // if the app has more than one window (option: and has no window on the current workspace),
         // don't activate the app, only move the overview to the workspace with the app's recent window
-        } else if (gOptions.get('dashShowWindowsBeforeActivation') && !isShiftPressed && this.app.get_n_windows() > 1 && !targetWindowOnCurrentWs) {
+        } else if (DASH_SHOW_WINS_BEFORE && !isShiftPressed && this.app.get_n_windows() > 1 && !targetWindowOnCurrentWs) {
             this._scroll = true;
             this._scrollTime = new Date();
             //const appWS = this.app.get_windows()[0].get_workspace();
             Main.wm.actionMoveWorkspace(appRecentWorkspace);
             Main.overview.dash.showAppsButton.checked = false;
             return;
-        } else if (gOptions.get('dashShiftClickMovesAppToCurrentWs') && isShiftPressed && this.app.get_windows().length) {
+        } else if (DASH_SHIFT_CLICK_MV && isShiftPressed && this.app.get_windows().length) {
             this._moveAppToCurrentWorkspace();
             return;
         } else if (isShiftPressed) {
@@ -566,6 +716,20 @@ var AppIconOverride = {
         this._removeMenuTimeout();
         this.fake_release();
 
+        if (!this._getWindowsOnCurrentWs) {
+            this._getWindowsOnCurrentWs = function() {
+                const winList = [];
+                this.app.get_windows().forEach(w => {
+                    if(w.get_workspace() === global.workspace_manager.get_active_workspace()) winList.push(w)
+                });
+                return winList;
+            };
+
+            this._windowsOnOtherWs = function() {
+                return (this.app.get_windows().length - this._getWindowsOnCurrentWs().length) > 0;
+            };
+        }
+
         if (!this._menu) {
             this._menu = new AppMenu(this, side, {
                 favoritesSection: true,
@@ -583,17 +747,6 @@ var AppIconOverride = {
 
             Main.uiGroup.add_actor(this._menu.actor);
             this._menuManager.addMenu(this._menu);
-
-            this._getWindowsOnCurrentWs = function() {
-                const winList = [];
-                this.app.get_windows().forEach(w => {
-                    if(w.get_workspace() === global.workspace_manager.get_active_workspace()) winList.push(w)
-                });
-                return winList;
-            }
-            this._windowsOnOtherWs = function() {
-                return (this.app.get_windows().length - this._getWindowsOnCurrentWs().length) > 0;
-            }
         }
 
         // once the menu is created, it stays unchanged and we need to modify our items based on current situation
@@ -607,11 +760,11 @@ var AppIconOverride = {
         this._menu.addMenuItem(separator);
 
         if (this.app.get_n_windows()) {
-            if (gOptions.get('appMenuForceQuit')) {
+            if (APP_MENU_FORCE_QUIT) {
                 popupItems.push([_('Force Quit'), () => this.app.get_windows()[0].kill()]);
             }
 
-            if (gOptions.get('appMenuCloseWindowsOnCurrentWs')) {
+            if (APP_MENU_CLOSE_WS) {
                 const nWin = this._getWindowsOnCurrentWs().length;
                 if (nWin) {
                     popupItems.push([_(`Close ${nWin} Windows on Current Workspace`), () => {
@@ -625,7 +778,7 @@ var AppIconOverride = {
                 }
             }
 
-            if (gOptions.get('appMenuMoveAppToWs') && this._windowsOnOtherWs()) {
+            if (APP_MENU_MV_TO_WS && this._windowsOnOtherWs()) {
                 popupItems.push([_('Move App to Current Workspace'), this._moveAppToCurrentWorkspace]);
             }
         }
@@ -649,6 +802,118 @@ var AppIconOverride = {
     }
 }
 
+var AppDisplayOverride = {
+    _loadApps: function() {
+        let appIcons = [];
+        this._appInfoList = Shell.AppSystem.get_default().get_installed().filter(appInfo => {
+            try {
+                appInfo.get_id(); // catch invalid file encodings
+            } catch (e) {
+                return false;
+            }
+            return this._parentalControlsManager.shouldShowApp(appInfo);
+        });
+
+        let apps = this._appInfoList.map(app => app.get_id());
+
+        let appSys = Shell.AppSystem.get_default();
+
+        this._folderIcons = [];
+
+        // Allow dragging of the icon only if the Dash would accept a drop to
+        // change favorite-apps. There are no other possible drop targets from
+        // the app picker, so there's no other need for a drag to start,
+        // at least on single-monitor setups.
+        // This also disables drag-to-launch on multi-monitor setups,
+        // but we hope that is not used much.
+        const isDraggable =
+            global.settings.is_writable('favorite-apps') ||
+            global.settings.is_writable('app-picker-layout');
+
+        apps.forEach(appId => {
+            let icon = this._items.get(appId);
+            if (!icon) {
+                let app = appSys.lookup_app(appId);
+
+                icon = new AppDisplay.AppIcon(app, { isDraggable });
+                icon.connect('notify::pressed', () => {
+                    if (icon.pressed)
+                        this.updateDragFocus(icon);
+                });
+            }
+
+            appIcons.push(icon);
+        });
+
+        // At last, if there's a placeholder available, add it
+        if (this._placeholder)
+            appIcons.push(this._placeholder);
+
+        const runningIDs = Shell.AppSystem.get_default().get_running().map(app => app.get_id());
+
+        // remove running apps
+        if (!APP_GRID_FAV_RUN) {
+            appIcons = appIcons.filter((icon) => icon.app && !(runningIDs.includes(icon.app.id) || this._appFavorites.isFavorite(icon.id)));
+        }
+
+        return appIcons;
+    },
+}
+
+var BaseAppViewOverride = {
+    _redisplay: function() {
+        let oldApps = this._orderedItems.slice();
+        let oldAppIds = oldApps.map(icon => icon.id);
+
+        let newApps = this._loadApps().sort(this._compareItems.bind(this));
+        let newAppIds = newApps.map(icon => icon.id);
+
+        let addedApps = newApps.filter(icon => !oldAppIds.includes(icon.id));
+        let removedApps = oldApps.filter(icon => !newAppIds.includes(icon.id));
+
+        // Remove old app icons
+        removedApps.forEach(icon => {
+            this._removeItem(icon);
+            icon.destroy();
+        });
+
+        newApps.forEach(icon => {
+            const [page, position] = this._getItemPosition(icon);
+            if (addedApps.includes(icon))
+                this._addItem(icon, page, position);
+            else if (page !== -1 && position !== -1)
+                this._moveItem(icon, page, position);
+        });
+
+        // Add new app icons, or move existing ones
+        const { itemsPerPage } = this._grid;
+        let appIcons = this._orderedItems;
+
+        // Reorder App Grid by usage
+        // sort all alphabetically
+        if(APP_GRID_ORDER > 0)
+            appIcons.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+        // then sort used apps by usage
+        if (APP_GRID_ORDER === 2)
+            appIcons.sort((a, b) => Shell.AppUsage.get_default().compare(a.app.id, b.app.id));
+        // sort running first
+        appIcons.sort((a, b) => a.app.get_state() !== Shell.AppState.RUNNING && b.app.get_state() === Shell.AppState.RUNNING);
+        appIcons.forEach((icon, i) => {
+            const page = Math.floor(i / itemsPerPage);
+            const position = i % itemsPerPage;
+            this._moveItem(icon, page, position);
+        });
+        this._orderedItems = appIcons;
+
+        this.emit('view-loaded');
+    },
+
+    _canAccept: function(source) {
+        return false;
+        //return source instanceof AppViewItem;
+    }
+}
+
 // this function switches workspaces with windows of the scrolled app and lowers opacity of other windows in the overview to quickly find its windows
 function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
     const _delegate = appIcon ? appIcon : this;
@@ -656,7 +921,7 @@ function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
     _delegate._leaveConnectionID = _delegate.connect('leave-event', () => _highlightMyWindows(_delegate, _delegate.app, 255));
     _delegate._scrollConnectionID = _delegate.connect_after('scroll-event', (actor, event) => {
 
-        if (!gOptions.get('dashScrollSwitchesAppWindowsWs'))
+        if (!DASH_SCROLL_SWITCH_APP_WS)
             return Clutter.EVENT_PROPAGATE;
 
         // this signal should work only for icons in the Dash, not for the App Display
@@ -704,7 +969,7 @@ function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
 }
 
 function _highlightMyWindows (delegate, app, othersOpacity = 50) {
-    if (!gOptions.get('dashHoverIconHighlitsWindows'))
+    if (!DASH_HOVER_HIGHLIGHT_WINS)
         return;
 
     // this signal should work only for icons in the Dash, not for the App Display
@@ -770,7 +1035,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                     titleOpacity = 0;
                 }
 
-                titleOpacity = gOptions.get('alwaysShowWindowTitles') ? 255 : titleOpacity;
+                titleOpacity = ALWAYS_SHOW_WIN_TITLES ? 255 : titleOpacity;
                 // If we're supposed to animate and an animation in our direction
                 // is already happening, let that one continue
                 const ongoingTransition = windowPreview._title.get_transition('opacity');
@@ -781,7 +1046,7 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                             duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
                             onComplete: () => {
                                 if (titleOpacity === 0) {
-                                    if(gOptions.get('alwaysShowWindowTitles')) {
+                                    if(ALWAYS_SHOW_WIN_TITLES) {
                                         windowPreview._title.opacity = 255;
                                     }
                                     //windowPreview._closeButton.opacity = 0;
@@ -790,8 +1055,11 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                                 }
                             }
                         });
+                        windowPreview._closeButton.ease({
+                            opacity: titleOpacity,
+                            duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
+                        });
                     }
-
 
                 if (onlyShowTitles)
                     return;
@@ -809,8 +1077,6 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
 // WorkspaceThumbnail
 var WorkspaceThumbnailOverride = {
     after__init: function () {
-        const SHOW_WST_LABELS = gOptions.get('showWsTmbLabels');
-        const SHOW_WST_LABELS_ON_HOVER = true;//gOptions.get('showWsTmbLabelsOnHover');
         // add workspace thumbnails labels if enabled
         if (SHOW_WST_LABELS) { // 0 - disable
             // layout manager allows aligning widget childs
@@ -846,11 +1112,12 @@ var WorkspaceThumbnailOverride = {
             this._wstLabel.opacity = this._wstLabel._maxOpacity;
             //this.add_child(this._wstLabel);
             //this.set_child_above_sibling(this._wstLabel, null);
-            if (SHOW_WST_LABELS_ON_HOVER) {
+            if (SHOW_WST_LABELS) {
                 this.reactive = true;
                 this._wstLabel.opacity = 0;
                 Main.layoutManager.addChrome(this._wstLabel);
                 this._wstLabel.hide();
+
                 this.connect('enter-event', ()=> {
                     this._wstLabel.show();
                     let [stageX, stageY] = this.get_transformed_position();
@@ -875,6 +1142,7 @@ var WorkspaceThumbnailOverride = {
                         opacity: this._wstLabel._maxOpacity,
                     });
                 });
+
                 this.connect('leave-event', ()=> {
                     this._wstLabel.ease({
                         duration: 100,
@@ -884,14 +1152,18 @@ var WorkspaceThumbnailOverride = {
                     })
                 });
 
-                this.connect('destroy', () => {
-                    Main.layoutManager.removeChrome(this._wstLabel);
+                /*this.connect('destroy', () => {
                     this._wstLabel.destroy();
-                });
+                });*/
             }
         }
 
-        if (!gOptions.get('showWsSwitcherBg'))
+        if (WS_TMB_HOVER_SWITCH) {
+            this.reactive = true;
+            this.connect('enter-event', () => Main.wm.actionMoveWorkspace(this.metaWorkspace));
+        }
+
+        if (!SHOW_WS_TMB_BG)
             return;
 
         this._bgManager = new Background.BackgroundManager({

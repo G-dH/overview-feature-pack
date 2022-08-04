@@ -59,6 +59,9 @@
     <key type="b" name="search-windows-click-empty-space">
       <default>true</default>
     </key>
+    <key type="b" name="search-windows-fuzzy">
+      <default>true</default>
+    </key>
     <key type="i" name="show-wst-labels">
       <default>1</default>
     </key>
@@ -67,6 +70,15 @@
     </key>
     <key type="b" name="show-ws-switcher-bg">
       <default>true</default>
+    </key>
+    <key type="b" name="ws-tmb-switch-on-hover">
+      <default>true</default>
+    </key>
+    <key type="i" name="app-grid-order">
+      <default>2</default>
+    </key>
+    <key type="b" name="app-grid-fav-run">
+      <default>false</default>
     </key>
   </schema>
 </schemalist>

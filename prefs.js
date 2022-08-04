@@ -30,9 +30,11 @@ let windowWidget;
 const GENERAL_TITLE = _('General');
 const GENERAL_ICON = 'preferences-system-symbolic';
 const DASH_TITLE = _('Dash');
-const DASH_ICON = 'view-app-grid-symbolic';
+const DASH_ICON = 'user-bookmarks-symbolic';
 const SEARCH_TITLE = _('Search');
 const SEARCH_ICON = 'edit-find-symbolic';
+const APPGRID_TITLE = _('App Grid');
+const APPGRID_ICON = 'view-app-grid-symbolic';
 
 function _newImageFromIconName(name) {
     return Gtk.Image.new_from_icon_name(name);
@@ -54,6 +56,10 @@ function fillPreferencesWindow(window) {
         title: DASH_TITLE,
         icon_name: DASH_ICON
     });
+    const appGridPage = getAdwPage(_getAppGridOptionList(), {
+        title: APPGRID_TITLE,
+        icon_name: APPGRID_ICON
+    });
     const searchPage = getAdwPage(_getSearchOptionList(), {
         title: SEARCH_TITLE,
         icon_name: SEARCH_ICON
@@ -61,6 +67,7 @@ function fillPreferencesWindow(window) {
 
     window.add(overviewOptionsPage);
     window.add(dashOptionsPage);
+    window.add(appGridPage);
     window.add(searchPage);
 
     window.set_search_enabled(true);
@@ -107,11 +114,13 @@ function buildPrefsWidget() {
 
     stack.add_named(getLegacyPage(_getGeneralOptionList()), 'general');
     stack.add_named(getLegacyPage(_getDashOptionList()), 'dash');
+    stack.add_named(getLegacyPage(_getAppGridOptionList()), 'appgrid');
     stack.add_named(getLegacyPage(_getSearchOptionList()), 'misc');
 
     const pagesBtns = [
         [new Gtk.Label({ label: GENERAL_TITLE}), _newImageFromIconName(GENERAL_ICON, Gtk.IconSize.BUTTON)],
         [new Gtk.Label({ label: DASH_TITLE}), _newImageFromIconName(DASH_ICON, Gtk.IconSize.BUTTON)],
+        [new Gtk.Label({ label: APPGRID_TITLE}), _newImageFromIconName(APPGRID_ICON, Gtk.IconSize.BUTTON)],
         [new Gtk.Label({ label: MISC_TITLE}), _newImageFromIconName(MISC_ICON, Gtk.IconSize.BUTTON)],
     ];
 
@@ -145,7 +154,6 @@ function buildPrefsWidget() {
         const height = 700;
         window.set_default_size(width, height);
 
-        
         const headerbar = window.get_titlebar();
         headerbar.title_widget = stackSwitcher;
 
@@ -552,7 +560,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Always Show Window Titles'),
-            _('Window titles will always be visible, not only when you hover the mouse pointer over the window preview.'),
+            _('Window titles will always be visible, not only when you hover the mouse pointer over the window preview. Enable also previous option "Move Titles Into Windows" to make all titles visible.'),
             _newSwitch(),
             'alwaysShowWindowTitles'
         )
@@ -561,7 +569,7 @@ function _getGeneralOptionList() {
     optionList.push(
         _optionsItem(
             _('Hover Selects Window For Activation'),
-            _('When active, window under the mouse pointer will be activated when leaving the Overview even without clicking. Press Super, hover a window, press Super again to activate it.'),
+            _('When active, window under the mouse pointer will be activated when leaving the Overview even without clicking. Press Super, place mouse pointer over a window, press Super again to activate it.'),
             _newSwitch(),
             'hoverActivatesWindowOnLeave'
         )
@@ -579,6 +587,24 @@ function _getGeneralOptionList() {
                 [_('Index + WS Name'), 2],
                 [_('Index + App Name'), 3],
             ]
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Hovering Over WS Thumbnail Switches Workspace'),
+            _('Just hover the mouse pointer over a workspace thumbnail to switch to the workspace, no clicking needed.'),
+            _newSwitch(),
+            'wsTmbSwitchOnHover'
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Show Wallpaper in Workspace Switcher Thumbnails'),
+            _('Each workspace switcher thumbnail backround will show the current wallpaper (if not covered by windows).'),
+            _newSwitch(),
+            'showWsSwitcherBg'
         )
     );
 
@@ -623,8 +649,8 @@ function _getDashOptionList() {
 
     optionList.push(
         _optionsItem(
-            _('Hovering Icon Highlights App Windows'),
-            'When hovering an app icon, all app window previews will show their titles and the recently used window will be marked by the close button.',
+            _('Hovering Over Icon Highlights App Windows'),
+            'When hovering over an app icon, all app window previews will show their titles and the recently used window will be marked by the close button.',
             _newSwitch(),
             'dashHoverIconHighlitsWindows'
         )
@@ -703,6 +729,44 @@ function _getDashOptionList() {
 }
     //--------------------------------------------------------------------
 
+//-----------------------------------------------------
+function _getAppGridOptionList() {
+    const optionList = [];
+    // options item format:
+    // [text, tooltip, widget, settings-variable, options for combo]
+
+    optionList.push(
+        _optionsItem(
+            _('Sorting'),
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Apps Order'),
+            _('Choose sorting method for the app grid. Note that sorting by alphabet and usage ignores folders.'),
+            _newComboBox(),
+            //_newDropDown(),
+            'appGridOrder',
+            [   [_('Default'), 0],
+                [_('Alphabetically'), 1],
+                [_('By Usage'), 2],
+            ]
+        )
+    );
+
+    optionList.push(
+        _optionsItem(
+            _('Include Dash Items'),
+            'Include favorite / running apps currently present in the Dash.',
+            _newSwitch(),
+            'appGridIncludeDash'
+        )
+    );
+
+    return optionList;
+}
+
 function _getSearchOptionList() {
     const optionList = [];
     // options item format:
@@ -721,6 +785,16 @@ function _getSearchOptionList() {
             'Activates built-in window search provider to add open windows to the search results. You can search app names and window titles. You can also use "wq " prefix to suppress results from other search providers. Search supports fuzzy matches, more weight has exact match and then windows from current workspace.',
             wspSwitch,
             'searchWindowsEnable'
+        )
+    );
+
+    const wspFuzzySwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Enable Fuzzy Match'),
+            'Fuzzy match allows you to find "Firefox" even if you type "ffx". If fuzzy match disabled, you need enter exact patterns separated by a space, but in arbitrary order.',
+            wspFuzzySwitch,
+            'searchWindowsFuzzy'
         )
     );
 
@@ -781,6 +855,7 @@ function _getSearchOptionList() {
         wspShiftSwitch.sensitive = wspSwitch.active;
         wspCtrlShiftSwitch.sensitive = wspSwitch.active;
         wspClickEmptySwitch.sensitive = wspSwitch.active;
+        wspFuzzySwitch.sensitive = wspSwitch.active;
     };
     _setOptionsSensitivity();
     wspSwitch.connect('notify::active', () => {
