@@ -115,13 +115,13 @@ function buildPrefsWidget() {
     stack.add_named(getLegacyPage(_getGeneralOptionList()), 'general');
     stack.add_named(getLegacyPage(_getDashOptionList()), 'dash');
     stack.add_named(getLegacyPage(_getAppGridOptionList()), 'appgrid');
-    stack.add_named(getLegacyPage(_getSearchOptionList()), 'misc');
+    stack.add_named(getLegacyPage(_getSearchOptionList()), 'search');
 
     const pagesBtns = [
         [new Gtk.Label({ label: GENERAL_TITLE}), _newImageFromIconName(GENERAL_ICON, Gtk.IconSize.BUTTON)],
         [new Gtk.Label({ label: DASH_TITLE}), _newImageFromIconName(DASH_ICON, Gtk.IconSize.BUTTON)],
         [new Gtk.Label({ label: APPGRID_TITLE}), _newImageFromIconName(APPGRID_ICON, Gtk.IconSize.BUTTON)],
-        [new Gtk.Label({ label: MISC_TITLE}), _newImageFromIconName(MISC_ICON, Gtk.IconSize.BUTTON)],
+        [new Gtk.Label({ label: SEARCH_TITLE}), _newImageFromIconName(SEARCH_ICON, Gtk.IconSize.BUTTON)],
     ];
 
     let stBtn = stackSwitcher.get_first_child ? stackSwitcher.get_first_child() : null;
