@@ -9,7 +9,7 @@
 
 'use strict';
 
-const { Clutter, GLib, Meta, Shell, St, Pango } = imports.gi;
+const { Clutter, GLib, Meta, Shell, St, Pango, Graphene } = imports.gi;
 const { AppMenu } = imports.ui.appMenu;
 const PopupMenu = imports.ui.popupMenu;
 const BoxPointer = imports.ui.boxpointer;
@@ -43,13 +43,15 @@ let _workspaceInjections = {};
 let _dashRedisplayTimeoutId = 0;
 let _hoverActivatesWindowSigId = 0;
 let _appSystemStateSigId = 0;
+let _switchWsOnHoverDelayId = 0;
+let _showAppsIconBtnPressId = 0;
 let _origAppDisplayAcceptDrop;
 let _origAppViewItemHandleDragOver;
 let _origAppViewItemAcceptDrop;
 
 let SEARCH_WINDOWS_ENABLED;
 let SEARCH_WINDOWS_SPACE;
-let SEARCH_WIN_CLICK_EMPTY;
+let SEARCH_WIN_CLICK_APPS_ICON;
 let SPACE_ACTIVATES_DASH;
 let SHIFT_REORDERS_WS;
 let APP_MENU_MV_TO_WS;
@@ -118,7 +120,7 @@ function _updateSettings(settings, key) {
     SPACE_ACTIVATES_DASH = gOptions.get('spaceActivatesDash', true);
     SHIFT_REORDERS_WS = gOptions.get('shiftReordersWs', true);
 
-    SEARCH_WIN_CLICK_EMPTY = gOptions.get('searchWindowsClickEmptySpace', true);
+    SEARCH_WIN_CLICK_APPS_ICON = gOptions.get('searchWindowsClickAppsIcon', true);
 
     APP_MENU_MV_TO_WS = gOptions.get('appMenuMoveAppToWs', true);
     APP_MENU_CLOSE_WS = gOptions.get('appMenuCloseWindowsOnCurrentWs', true);
@@ -152,6 +154,7 @@ function _updateSettings(settings, key) {
     _updateWindowPreview();
     _updateWorkspaceThumbnail();
     _updateAppIcon();
+    _updateDash();
     _updateAppViewItem();
     _updateAppGrid();
     _updateHotCorner();
@@ -177,7 +180,7 @@ function _updateWorkspacesDisplay(reset = false) {
     }
 }
 
-function _updateWorkspace(reset = false) {
+/*function _updateWorkspace(reset = false) {
     if (!reset && SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_EMPTY) {
         _injectWorkspace();
     } else {
@@ -186,7 +189,7 @@ function _updateWorkspace(reset = false) {
         }
         _workspaceInjections = {};
     }
-}
+}*/
 
 function _updateWindowPreview(reset = false) {
     if (!reset && (ALWAYS_SHOW_WIN_TITLES || HOVER_ACTIVATES_ON_LEAVE)) {
@@ -214,6 +217,9 @@ function _updateAppIcon(reset = false) {
     }
 
     if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS || APP_GRID_FULL_NAMES)) {
+        for (let name in _appIconInjections) {
+            _Util.removeInjection(AppDisplay.AppIcon.prototype, _appIconInjections, name);
+        }
         _injectAppIcon();
         //reset dash icons
         _updateDash(true);
@@ -221,10 +227,10 @@ function _updateAppIcon(reset = false) {
     } else {
         for (let name in _appIconInjections) {
             _Util.removeInjection(AppDisplay.AppIcon.prototype, _appIconInjections, name);
-            //reset dash icons
-            _updateDash(true);
         }
         _appIconInjections = {};
+        //reset dash icons
+        _updateDash(true);
     }
 }
 
@@ -315,8 +321,6 @@ function _moveDashShowAppsIconLeft(reset = false) {
 function _updateDash(remove = false) {
     // destroying dash icons and redisplay has consequences - error nessages in log and placeholders whilde DND icons in Dash
 
-    // sometimes Dash missing some icons, _redisplay can add them. But this executes too early after shell restarts so it has no effect here in this case
-    //Main.overview.dash._redisplay();
     Main.overview.dash._box.get_children().forEach(c => {
         const appIcon = c.child;
 
@@ -333,7 +337,7 @@ function _updateDash(remove = false) {
                 appIcon.disconnect(appIcon._leaveConnectionID);
                 appIcon._leaveConnectionID = 0;
             }
-        } else if (DASH_HOVER_HIGHLIGHT_WINS && appIcon && !appIcon._scrollConnectionID) {
+        } else if ((DASH_HOVER_HIGHLIGHT_WINS || DASH_SCROLL_SWITCH_APP_WS) && appIcon) {
             _connectAppIconScrollEnterLeave(null, null, appIcon);
         }
     });
@@ -348,6 +352,30 @@ function _updateDash(remove = false) {
             return GLib.SOURCE_REMOVE;
         }
     );
+
+    if (SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_APPS_ICON && !remove) {
+        if (_showAppsIconBtnPressId) {
+            Main.overview.dash._showAppsIcon.disconnect(_showAppsIconBtnPressId);
+        }
+        Main.overview.dash._showAppsIcon.reactive = true;
+        _showAppsIconBtnPressId = Main.overview.dash._showAppsIcon.connect('button-press-event', (actor, event) => {
+            if (event.get_button() !== 3)
+                return Clutter.EVENT_PROPAGATE;
+            if (Main.overview.searchEntry.get_text())
+                Main.overview.searchEntry.set_text('');
+            else
+                _activateWindowSearchProvider();
+
+            return Clutter.EVENT_STOP;
+        });
+    } else {
+        if (_showAppsIconBtnPressId) {
+            Main.overview.dash._showAppsIcon.disconnect(_showAppsIconBtnPressId);
+            _showAppsIconBtnPressId = 0;
+        }
+        Main.overview.dash._showAppsIcon.reactive = false;
+    }
+
 }
 
 //***********************************************************************************/
@@ -363,7 +391,7 @@ function _activateWindowSearchProvider() {
 
 //---Workspace--------
 
-function _injectWorkspace() {
+/*function _injectWorkspace() {
     _workspaceInjections['_init'] = _Util.injectToFunction(
         Workspace.Workspace.prototype, '_init', function() {
             if (SEARCH_WINDOWS_ENABLED && SEARCH_WIN_CLICK_EMPTY) {
@@ -380,7 +408,7 @@ function _injectWorkspace() {
             }
         }
     );
-}
+}*/
 
 
 // WorkspacesDisplay
@@ -526,15 +554,25 @@ function _injectWindowPreview() {
     _windowPreviewInjections['_init'] = _Util.injectToFunction(
         WindowPreview.WindowPreview.prototype, '_init', function() {
             if (MOVE_WIN_TITLES) {
-                this._title.get_constraints()[1].offset = - 1.3 * WindowPreview.ICON_SIZE * (this._icon.visible ? 1 : 0.5);
+                // try to adapt to the icon size adjusted by the Vertical Workspaces extension
+                const WIN_PREVIEW_ICON_SIZE = this._iconSize ? this._iconSize : WindowPreview.ICON_SIZE;
+
+                const { scaleFactor } = St.ThemeContext.get_for_stage(global.stage);
+                const iconOverlap = WIN_PREVIEW_ICON_SIZE * WindowPreview.ICON_OVERLAP;
+                //const iconOverlap = WindowPreview.ICON_SIZE * WindowPreview.ICON_OVERLAP;
+                // we cannot get propper title height before it gets to the stage, so 35 is estimated height + spacing
+                this._title.get_constraints()[1].offset = scaleFactor * (- iconOverlap - 35);
                 this.set_child_above_sibling(this._title, null);
             }
-            if (ALWAYS_SHOW_WIN_TITLES)
+
+            if (ALWAYS_SHOW_WIN_TITLES) {
                 this._title.show();
                 this._title.opacity = 255;
+            }
         }
     );
 }
+
 // add fading in/out window title for option always show titles
 let WindowPreviewOverride = {
     _updateIconScale: function() {
@@ -715,7 +753,7 @@ let AppIconOverride = {
         // don't activate the app, only move the overview to the workspace with the app's recent window
         } else if (DASH_SHOW_WINS_BEFORE && !isShiftPressed && this.app.get_n_windows() > 1 && !targetWindowOnCurrentWs) {
             this._scroll = true;
-            this._scrollTime = new Date();
+            this._scrollTime = Date.now();
             //const appWS = this.app.get_windows()[0].get_workspace();
             Main.wm.actionMoveWorkspace(appRecentWorkspace);
             Main.overview.dash.showAppsButton.checked = false;
@@ -940,60 +978,7 @@ let BaseAppViewOverride = {
     }
 }
 
-// this function switches workspaces with windows of the scrolled app and lowers opacity of other windows in the overview to quickly find its windows
-function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
-    const _delegate = appIcon ? appIcon : this;
-    _delegate._enterConnectionID = _delegate.connect('enter-event', () => _highlightMyWindows(_delegate, _delegate.app));
-    _delegate._leaveConnectionID = _delegate.connect('leave-event', () => _highlightMyWindows(_delegate, _delegate.app, 255));
-    _delegate._scrollConnectionID = _delegate.connect_after('scroll-event', (actor, event) => {
-
-        if (!DASH_SCROLL_SWITCH_APP_WS)
-            return Clutter.EVENT_PROPAGATE;
-
-        // this signal should work only for icons in the Dash, not for the App Display
-        if (Main.overview.dash.showAppsButton.checked)
-            return Clutter.EVENT_PROPAGATE;
-
-        if (_delegate._scrollTime && (new Date() - _delegate._scrollTime) < 200) {
-            return Clutter.EVENT_STOP;
-        }
-
-        const direction = event.get_scroll_direction();
-        if (direction === Clutter.ScrollDirection.UP || direction === Clutter.ScrollDirection.DOWN) {
-            _delegate._scroll = true;
-            if (_delegate.app.get_n_windows()) {
-                const appWorkspaces = [];
-                _delegate.app.get_windows().forEach( w => {
-                    const ws = w.get_workspace();
-                    if (!appWorkspaces.includes(ws)) {
-                        appWorkspaces.push(ws);
-                    }
-                });
-                appWorkspaces.sort((a,b) => b.index() < a.index());
-                let targetWsIdx;
-                const currentWS = global.workspace_manager.get_active_workspace();
-                const currIdx = appWorkspaces.indexOf(currentWS);
-                if (direction === Clutter.ScrollDirection.UP) {
-                    targetWsIdx = (currIdx + appWorkspaces.length - 1) % appWorkspaces.length;
-                } else {
-                    targetWsIdx = (currIdx + 1) % appWorkspaces.length;
-                }
-
-                //const appWS = _delegate.app.get_windows()[0].get_workspace();
-                Main.wm.actionMoveWorkspace(appWorkspaces[targetWsIdx]);
-                Main.overview.dash.showAppsButton.checked = false;
-                _delegate._scrollTime = new Date();
-
-                // dimm windows of other apps
-                _highlightMyWindows(_delegate, _delegate.app);
-            }
-            return Clutter.EVENT_STOP;
-        }
-        // activate app's workspace
-        // and hide windows of other apps
-    });
-}
-
+// Always Show Full App Names
 let AppViewItemOverride = {
     _updateMultiline() {
         if (!this._expandTitleOnHover || !this.icon.label)
@@ -1025,28 +1010,172 @@ let AppViewItemOverride = {
     }
 }
 
-function _highlightMyWindows (delegate, app, othersOpacity = 50) {
-    if (!DASH_HOVER_HIGHLIGHT_WINS)
-        return;
+// this function switches workspaces with windows of the scrolled app and lowers opacity of other windows in the overview to quickly find its windows
+function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
+    appIcon = appIcon ? appIcon : this;
+    if (!appIcon._scrollConnectionID)
+        appIcon._scrollConnectionID = appIcon.connect_after('scroll-event', switchToNextAppWS);
 
-    // this signal should work only for icons in the Dash, not for the App Display
-    if (Main.overview.dash.showAppsButton.checked)
+    if (!appIcon._leaveConnectionID)
+        appIcon._leaveConnectionID = appIcon.connect('leave-event', () => _onAppLeave(appIcon));
+
+    if (!appIcon._enterConnectionID && DASH_HOVER_HIGHLIGHT_WINS)
+        appIcon._enterConnectionID = appIcon.connect('enter-event', () => _onAppEnter(appIcon));
+}
+
+function _onAppEnter(appIcon) {
+    // allow window highlighting only in overview WINDOW_PICKER state
+    if (Main.overview._overview._controls._stateAdjustment.get_value() != 1)
         return Clutter.EVENT_PROPAGATE;
 
-    const _delegate = delegate;
-    let onlyShowTitles = false;
-    if (othersOpacity === 255) {
-        // even if the mouse pointer is still above the app icon, the 'leave' signals are emited during switching workspace
-        // this timeout should prevent unwanted calls
-        if (_delegate._scrollTime && (new Date() - _delegate._scrollTime) < 200) {
-            return;
+    if (_switchWsOnHoverDelayId)
+        GLib.source_remove(_switchWsOnHoverDelayId);
+    _switchWsOnHoverDelayId = GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        200,
+        () => {
+            _highlightMyWindows(appIcon);
+            appIcon._highlightedTime = Date.now();
+            _switchWsOnHoverDelayId = 0;
+            return GLib.SOURCE_REMOVE;
         }
-        _delegate._scroll = false;
-    } else if (!_delegate._scroll) {
-        onlyShowTitles = true;
+    );
+}
+
+function _onAppLeave(appIcon) {
+    // even if the mouse pointer is still above the app icon, the 'leave' signals are emited during switching workspace
+    // this timeout should prevent unwanted calls
+    if (appIcon._switchWsTime && ((Date.now() - appIcon._switchWsTime) < 200)) {
+        return;
+     }
+
+     if(!_switchWsOnHoverDelayId) {
+        if (!appIcon._highlightedTime || ((Date.now() - appIcon._highlightedTime) > 50))
+            _highlightMyWindows(appIcon, 255);
+    } else {
+        GLib.source_remove(_switchWsOnHoverDelayId);
+        _switchWsOnHoverDelayId = 0;
+    }
+}
+
+function switchToNextAppWS(appIcon, event) {
+    if (!DASH_SCROLL_SWITCH_APP_WS)
+        return Clutter.EVENT_PROPAGATE;
+
+    // this signal should work only for icons in the Dash, not for the App Display
+    if (Main.overview._overview._controls._stateAdjustment.get_value() != 1)
+        return Clutter.EVENT_PROPAGATE;
+
+    if (appIcon._scrollTime && (Date.now() - appIcon._scrollTime) < 200) {
+        return Clutter.EVENT_STOP;
     }
 
+    const direction = event ? event.get_scroll_direction() : -1;
+    if (direction === Clutter.ScrollDirection.UP || direction === Clutter.ScrollDirection.DOWN || direction === -1) {
+        appIcon._scroll = true;
+        if (appIcon.app.get_n_windows()) {
+            const appWorkspaces = [];
+            appIcon.app.get_windows().forEach( w => {
+                const ws = w.get_workspace();
+                if (!appWorkspaces.includes(ws)) {
+                    appWorkspaces.push(ws);
+                }
+            });
+            appWorkspaces.sort((a,b) => b.index() < a.index());
+            let targetWsIdx;
+            const currentWS = global.workspace_manager.get_active_workspace();
+            let currIdx = appWorkspaces.indexOf(currentWS);
+            if (currIdx < 0) {
+                for (let i = 0; i < appWorkspaces.length; i++) {
+                    if (appWorkspaces[i].index() > currentWS.index()) {
+                        currIdx = i;
+                        break;
+                    }
+                }
+            }
+            if (direction === Clutter.ScrollDirection.UP) {
+                targetWsIdx = (currIdx + appWorkspaces.length - 1) % appWorkspaces.length;
+            } else if (direction === Clutter.ScrollDirection.DOWN) {
+                targetWsIdx = (currIdx + 1) % appWorkspaces.length;
+            } else {
+
+            }
+
+            //const appWS = appIcon.app.get_windows()[0].get_workspace();
+            Main.wm.actionMoveWorkspace(appWorkspaces[targetWsIdx]);
+            Main.overview.dash.showAppsButton.checked = false;
+            appIcon._scrollTime = Date.now();
+
+            // dimm windows of other apps
+            _highlightMyWindows(appIcon, 50, true);
+        }
+        return Clutter.EVENT_STOP;
+    }
+    // activate app's workspace
+    // and hide windows of other apps
+}
+
+function _highlightMyWindows (appIcon, othersOpacity = 50, forceOpacity = false) {
+    if (_switchWsOnHoverDelayId) {
+        GLib.source_remove(_switchWsOnHoverDelayId);
+        _switchWsOnHoverDelayId = 0;
+    }
+    /*if (!DASH_HOVER_HIGHLIGHT_WINS)
+        return;*/
+
+    // this signal should work only for icons in the Dash, not for the App Display
+    if (Main.overview.dash.showAppsButton.checked) {
+        return Clutter.EVENT_PROPAGATE;
+    }
+
+    if (!appIcon) {
+        appIcon = Main.overview.dash._box.get_first_child();
+        if (!appIcon)
+        return;
+    }
+
+    const OPACITY_HIGHLIGHT_ENABLED = (DASH_HOVER_HIGHLIGHT_WINS == 2 || forceOpacity);
+
+    let onlyShowTitles = false;
+    if (othersOpacity === 255) {
+        // even if the mouse pointer is still over the application icon, "leave" signals are emitted when switching workspaces
+        // this timeout should prevent unwanted calls
+        if (appIcon._scrollTime && (Date.now() - appIcon._scrollTime) < 200) {
+            return;
+        }
+        appIcon._scroll = false;
+    } /*else if (!appIcon._scroll) {
+        onlyShowTitles = true;
+    }*/
+
+    const app = appIcon.app;
     const currentWS = global.workspace_manager.get_active_workspace();
+
+    // if selected app hovered and has no window on the current workspace, switch workspace
+    //---------------------------------------------------------------------------
+    if (othersOpacity !== 255 && !appIcon._scroll) {
+        const appRecentWorkspace = _getAppRecentWorkspace(app);
+
+        if (!appRecentWorkspace)
+            return;
+
+            let targetWindowOnCurrentWs = false;
+        if (DASH_FOLLOW_RECENT_WIN) {
+            targetWindowOnCurrentWs = appRecentWorkspace === currentWS;
+        } else {
+            app.get_windows().forEach(
+                w => targetWindowOnCurrentWs = targetWindowOnCurrentWs || (w.get_workspace() === currentWS)
+            );
+        }
+        if (!targetWindowOnCurrentWs) {
+            Main.overview._overview._controls._workspaceAdjustment.set_value(appRecentWorkspace.index());
+            appIcon._switchWsTime = Date.now();
+            Main.wm.actionMoveWorkspace(appRecentWorkspace);
+        }
+    }
+    //---------------------------------------------------------------------------
+
+    //const currentWS = global.workspace_manager.get_active_workspace();
     let lastUsedWinForWs = null;
     app.get_windows().forEach(w => {
         if (!lastUsedWinForWs && w.get_workspace() === currentWS) {
@@ -1115,17 +1244,19 @@ function _highlightMyWindows (delegate, app, othersOpacity = 50) {
                         windowPreview._closeButton.ease({
                             opacity: titleOpacity,
                             duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
+                            onComplete: othersOpacity === 255 && windowPreview._closeButton.hide()
                         });
                     }
 
-                if (onlyShowTitles)
-                    return;
+                if (onlyShowTitles) return;
 
-                windowPreview.ease({
-                    opacity: opacity,
-                    duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
-                    mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                });
+                if (OPACITY_HIGHLIGHT_ENABLED || opacity == 255) {
+                    windowPreview.ease({
+                        opacity: opacity,
+                        duration: WindowPreview.WINDOW_OVERLAY_FADE_TIME,
+                        mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                    });
+                }
             });
         });
     });

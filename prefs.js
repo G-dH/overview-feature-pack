@@ -650,16 +650,20 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Hovering Over Icon Highlights App Windows'),
-            'When hovering over an app icon, all app window previews will show their titles and the recently used window will be marked by the close button.',
-            _newSwitch(),
-            'dashHoverIconHighlitsWindows'
+            _('When hovering mouse pointer over an app icon, overview will switch to the workspace with app window(s) (if needed), all app window previews will show their titles (enable option "Move Titles Into Windows" to see them all), the most recently used window will be marked by the close button and optionally the opacity of all other windows will be reduced. If option "Prefer Most Recently Used Window" is enabled, workspace will be switched to the one with the most recently used window of the app, even if there is another app window on the current workspace.'),
+            _newComboBox(),
+            'dashHoverIconHighlitsWindows',
+            [   [_('Disable'), 0],
+                [_('Window Titles'), 1],
+                [_('Titles + Opacity'), 2],
+            ]
         )
     );
 
     optionList.push(
         _optionsItem(
             _('Scroll Switches App Windows Workspaces'),
-            "Scrolling over an app icon will move the overview to the next workspace that contains the app window. If the previous option is enabled, the opacity of other app window previews will be reduced to highlight windows of the app.",
+            _("Scrolling over an app icon will move the overview to the next workspace that contains the app window. If the previous option is enabled, the opacity of other app window previews will be reduced to highlight windows of the app."),
             _newSwitch(),
             'dashScrollSwitchesAppWindowsWs'
         )
@@ -670,7 +674,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Show Windows Before Activation'),
-            'if the app you clicked on has more than one window and no [window / recently used window (depends on the following option)] is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.',
+            _('if the app you clicked on has more than one window and no [window / recently used window (depends on the following option)] is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.'),
             showWindowsBeforeBtn,
             'dashShowWindowsBeforeActivation'
         )
@@ -682,7 +686,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Prefer Most Recently Used Window'),
-            'Tweak of the the previous option - the globally most recently used window will take precedence over the most recently used window of the current workspace.',
+            _('Tweak of the the previous option - the globally most recently used window will take precedence over the most recently used window of the current workspace.'),
             preferMruWinBtn,
             'dashClickFollowsRecentWindow'
         )
@@ -701,7 +705,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Force Quit'),
-            'Adds item that allows you to kill (-9) the app if needed.',
+            _('Adds item that allows you to kill (-9) the app if needed.'),
             _newSwitch(),
             'appMenuForceQuit'
         )
@@ -710,7 +714,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Move App to Current Workspace'),
-            'Adds item that allows you to move all windows of the app to the current workspace.',
+            _('Adds item that allows you to move all windows of the app to the current workspace.'),
             _newSwitch(),
             'appMenuMoveAppToWs'
         )
@@ -719,7 +723,7 @@ function _getDashOptionList() {
     optionList.push(
         _optionsItem(
             _('Close Windows on Current Workspace'),
-            'Adds item that allows you to close all windows of the app on the current workspace. This item appears only if at least one window is available',
+            _('Adds item that allows you to close all windows of the app on the current workspace. This item appears only if at least one window is available'),
             _newSwitch(),
             'appMenuCloseWindowsOnCurrentWs'
         )
@@ -763,7 +767,7 @@ function _getAppGridOptionList() {
     optionList.push(
         _optionsItem(
             _('Include Dash Items'),
-            'Include favorite / running apps currently present in the Dash. This option works only for Alphabetical and By Usage sorting modes, Default mode stays untouched.',
+            _('Include favorite / running apps currently present in the Dash. This option works only for Alphabetical and By Usage sorting modes, Default mode stays untouched.'),
             _newSwitch(),
             'appGridIncludeDash'
         )
@@ -772,7 +776,7 @@ function _getAppGridOptionList() {
     optionList.push(
         _optionsItem(
             _('Always Show Full App Names'),
-            'Dont elipsize app names.',
+            _('Dont elipsize app names.'),
             _newSwitch(),
             'appGridFullNames'
         )
@@ -796,19 +800,9 @@ function _getSearchOptionList() {
     optionList.push(
         _optionsItem(
             _('Enable Window Search Provider'),
-            'Activates built-in window search provider to add open windows to the search results. You can search app names and window titles. You can also use "wq " prefix to suppress results from other search providers. Search supports fuzzy matches, more weight has exact match and then windows from current workspace.',
+            _('Activates built-in window search provider to add open windows to the search results. You can search app names and window titles. You can also use "wq " prefix to suppress results from other search providers. Search supports fuzzy matches, more weight has exact match and then windows from current workspace.'),
             wspSwitch,
             'searchWindowsEnable'
-        )
-    );
-
-    const wspFuzzySwitch = _newSwitch();
-    optionList.push(
-        _optionsItem(
-            _('Enable Fuzzy Match'),
-            'Fuzzy match allows you to find "Firefox" even if you type "ffx". If fuzzy match disabled, you need enter exact patterns separated by a space, but in arbitrary order.',
-            wspFuzzySwitch,
-            'searchWindowsFuzzy'
         )
     );
 
@@ -816,9 +810,29 @@ function _getSearchOptionList() {
     optionList.push(
         _optionsItem(
             _('Space Activates Window Search'),
-            'Pressing the Space bar in the Overview window picker pastes "wq: " prefix to the search entry to activate the search and suppress results from other search providers.',
+            _('Pressing the Space bar in the Overview window picker pastes "wq: " prefix to the search entry to activate the search and suppress results from other search providers.'),
             wspSpaceSwitch,
             'searchWindowsSpaceKey'
+        )
+    );
+
+    const wspClickAppsIconSwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Secondary Click On Show Apps Icon Activates Window Search'),
+            _("Activate window search by right-clicking on Dash's Show Apps Icon."),
+            wspClickAppsIconSwitch,
+            'searchWindowsClickAppsIcon'
+        )
+    );
+
+    const wspFuzzySwitch = _newSwitch();
+    optionList.push(
+        _optionsItem(
+            _('Enable Fuzzy Match'),
+            _('Fuzzy match allows you to find "Firefox" even if you type "ffx". If fuzzy match disabled, you need enter exact patterns separated by a space, but in arbitrary order.'),
+            wspFuzzySwitch,
+            'searchWindowsFuzzy'
         )
     );
 
@@ -826,7 +840,7 @@ function _getSearchOptionList() {
     optionList.push(
         _optionsItem(
             _('Enable Commands in Search Entry'),
-            'You can use following commands separated by the space at the end of entered pattern:\n/x!   \t\t\t- close selected window\n/xa! \t\t\t- close all found windows\n/m[number] \t\t- (e.g. /m6) move selected window to workspace with given index\n/ma[number] \t- move all found windows to workspace with given index',
+            _('You can use following commands separated by the space at the end of entered pattern:\n/x!   \t\t\t- close selected window\n/xa! \t\t\t- close all found windows\n/m[number] \t\t- (e.g. /m6) move selected window to workspace with given index\n/ma[number] \t- move all found windows to workspace with given index'),
             wspCommandSwitch,
             'searchWindowsCommands'
         )
@@ -836,7 +850,7 @@ function _getSearchOptionList() {
     optionList.push(
         _optionsItem(
             _('Shift Moves Window to Current Workspace'),
-            'Hold down the Shift key while activating the selected search result to move the window to the curent workspace.',
+            _('Hold down the Shift key while activating the selected search result to move the window to the curent workspace.'),
             wspShiftSwitch,
             'searchWindowsShiftMoves'
         )
@@ -847,19 +861,9 @@ function _getSearchOptionList() {
     optionList.push(
         _optionsItem(
             _('Ctrl+Shift Moves All Windows to Current Workspace'),
-            'Hold down the Ctrl and Shift keys while activating the search result to move all found windows to the current workspace and activate the selected window.',
+            _('Hold down the Ctrl and Shift keys while activating the search result to move all found windows to the current workspace and activate the selected window.'),
             wspCtrlShiftSwitch,
             'searchWindowsShiftMoves' // this is intentional, activation of one option activates the other
-        )
-    );
-
-    const wspClickEmptySwitch = _newSwitch();
-    optionList.push(
-        _optionsItem(
-            _('Secondary Click On Workspace Activates Window Search'),
-            'Activate window search by right-clicking on an empty space on the workspace.',
-            wspClickEmptySwitch,
-            'searchWindowsClickEmptySpace'
         )
     );
 
@@ -868,7 +872,7 @@ function _getSearchOptionList() {
         wspCommandSwitch.sensitive = wspSwitch.active;
         wspShiftSwitch.sensitive = wspSwitch.active;
         wspCtrlShiftSwitch.sensitive = wspSwitch.active;
-        wspClickEmptySwitch.sensitive = wspSwitch.active;
+        wspClickAppsIconSwitch.sensitive = wspSwitch.active;
         wspFuzzySwitch.sensitive = wspSwitch.active;
     };
     _setOptionsSensitivity();

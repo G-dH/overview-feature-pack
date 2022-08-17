@@ -29,7 +29,7 @@ var Options = class Options {
         this._connectionIds = [];
         this.options = {
             dashShiftClickMovesAppToCurrentWs: ['boolean', 'dash-shift-click-moves-app-to-current-ws'],
-            dashHoverIconHighlitsWindows: ['boolean', 'dash-hover-icon-highlights-windows'],
+            dashHoverIconHighlitsWindows: ['int', 'dash-hover-icon-highlights-wins'],
             dashShowWindowsBeforeActivation: ['boolean', 'dash-show-windows-before-activation'],
             dashClickFollowsRecentWindow: ['boolean', 'dash-click-follows-recent-window'],
             dashScrollSwitchesAppWindowsWs: ['boolean', 'dash-scroll-switches-app-windows-ws'],
@@ -46,7 +46,7 @@ var Options = class Options {
             searchWindowsSpaceKey: ['boolean', 'search-windows-space-key'],
             searchWindowsCommands: ['boolean', 'search-windows-commands'],
             searchWindowsShiftMoves: ['boolean', 'search-windows-shift-moves'],
-            searchWindowsClickEmptySpace: ['boolean', 'search-windows-click-empty-space'],
+            searchWindowsClickAppsIcon: ['boolean', 'search-windows-click-apps-icon'],
             searchWindowsFuzzy: ['boolean', 'search-windows-fuzzy'],
             showWsTmbLabels: ['int', 'show-wst-labels'],
             showWsTmbLabelsOnHover: ['boolean', 'show-wst-labels-on-hover'],
