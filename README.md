@@ -23,3 +23,4 @@ After installation you need to enable the extension and access its settings.
 ![OFP configuration window](OFP1.png)
 ![OFP configuration window](OFP2.png)
 ![OFP configuration window](OFP3.png)
+![OFP configuration window](OFP4.png)
