@@ -24,3 +24,18 @@ After installation you need to enable the extension and access its settings.
 ![OFP configuration window](OFP2.png)
 ![OFP configuration window](OFP3.png)
 ![OFP configuration window](OFP4.png)
+
+
+## Buy me a coffee
+If you like my extensions and want to keep me motivated, you can also buy me a coffee:
+[buymeacoffee.com/georgdh](https://buymeacoffee.com/georgdh)
+
+## Changelog
+
+### v2 (not yet released)
+
+**Added:**
+- App Grid sorting and content options
+- Option to always show full app names in the App Grid
+- Highlight app windows on Dash icon hover now switches workspace automaticaly and adds options to highlight windows by showing their titles or this plus decreasing other windows opacity.
+- Option to show workspace *index / index + workspace name / index + current app name* when mouse pointer hovers over a workspace thumbnail in the overview.
