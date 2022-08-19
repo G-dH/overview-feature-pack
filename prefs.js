@@ -35,6 +35,8 @@ const SEARCH_TITLE = _('Search');
 const SEARCH_ICON = 'edit-find-symbolic';
 const APPGRID_TITLE = _('App Grid');
 const APPGRID_ICON = 'view-app-grid-symbolic';
+const ABOUT_TITLE = _('About');
+const ABOUT_ICON = 'preferences-system-details-symbolic';
 
 function _newImageFromIconName(name) {
     return Gtk.Image.new_from_icon_name(name);
@@ -65,10 +67,16 @@ function fillPreferencesWindow(window) {
         icon_name: SEARCH_ICON
     });
 
+    const aboutPage = _getAboutPage({
+        title: ABOUT_TITLE,
+        icon_name: ABOUT_ICON
+    });
+
     window.add(overviewOptionsPage);
     window.add(dashOptionsPage);
     window.add(appGridPage);
     window.add(searchPage);
+    window.add(aboutPage);
 
     window.set_search_enabled(true);
 
@@ -76,7 +84,7 @@ function fillPreferencesWindow(window) {
 
     window.connect('close-request', _onDestroy);
 
-    const width = 600;
+    const width = 800;
     const height = 700;
     window.set_default_size(width, height);
 
@@ -884,3 +892,115 @@ function _getSearchOptionList() {
 }
 
 ///////////////////////////////////////////////////
+
+function _getAboutPage(pageProperties) {
+    const page = new Adw.PreferencesPage(pageProperties);
+
+    const aboutGroup = new Adw.PreferencesGroup({
+        title: Me.metadata.name,
+        hexpand: true,
+    });
+
+    const linksGroup = new Adw.PreferencesGroup({
+        title: _('Links'),
+        hexpand: true,
+    });
+
+    page.add(aboutGroup);
+    page.add(linksGroup);
+
+////////////////////////////////////////////////////
+
+    aboutGroup.add(_newAdwLabelRow({
+        title: _('Version'),
+        subtitle: _(''),
+        label: Me.metadata.version.toString()
+    }));
+
+    aboutGroup.add(_newResetRow({
+        title: _('Reset all options'),
+        subtitle: _('Set all options to default values.'),
+    }));
+
+
+    linksGroup.add(_newAdwLinkRow({
+        title: _('Homepage'),
+        subtitle: _('Source code and more info about this extension'),
+        uri: 'https://github.com/G-dH/overview-feature-pack'
+    }));
+
+    linksGroup.add(_newAdwLinkRow({
+        title: _('Gome Extensions'),
+        subtitle: _('Rate and comment the extension on GNOME Extensions site.'),
+        uri: 'https://extensions.gnome.org/extension/5192',
+    }));
+
+    linksGroup.add(_newAdwLinkRow({
+        title: _('Report a bug or suggest new feature'),
+        subtitle: _(''),
+        uri: 'https://github.com/G-dH/overview-feature-pack/issues',
+    }));
+
+    linksGroup.add(_newAdwLinkRow({
+        title: _('Buy Me a Coffee'),
+        subtitle: _('If you like this extension, you can help me with coffee expenses.'),
+        uri: 'https://buymeacoffee.com/georgdh'
+    }));
+
+    return page;
+}
+
+function _newAdwLabelRow(params) {
+    const label = new Gtk.Label({
+        label: params.label
+    });
+
+    const actionRow = new Adw.ActionRow({
+        title: params.title,
+        subtitle: params.subtitle,
+    });
+
+    actionRow.add_suffix(label);
+
+    return actionRow;
+}
+
+function _newAdwLinkRow(params) {
+    const linkBtn = new Gtk.LinkButton({
+        uri: params.uri,
+        halign: Gtk.Align.END,
+        valign: Gtk.Align.CENTER,
+    });
+
+    const actionRow = new Adw.ActionRow({
+        title: params.title,
+        subtitle: params.subtitle,
+        activatable_widget: linkBtn
+    });
+
+    actionRow.add_suffix(linkBtn);
+
+    return actionRow;
+}
+
+function _newResetRow(params) {
+    const btn = new Gtk.Button({
+        icon_name: 'view-refresh-symbolic',
+        halign: Gtk.Align.END,
+        valign: Gtk.Align.CENTER,
+    });
+    btn.connect('clicked', () => {
+        Object.keys(gOptions.options).forEach(key => {
+            gOptions.set(key, gOptions.getDefault(key));
+        });
+    });
+
+    const actionRow = new Adw.ActionRow({
+        title: params.title,
+        subtitle: params.subtitle,
+    });
+
+    actionRow.add_suffix(btn);
+
+    return actionRow;
+}
