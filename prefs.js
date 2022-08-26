@@ -15,6 +15,8 @@ const ExtensionUtils = imports.misc.extensionUtils;
 const Me             = ExtensionUtils.getCurrentExtension();
 const Settings       = Me.imports.settings;
 
+const shellVersion   = Settings.shellVersion;
+
 // gettext
 const _  = Settings._;
 
@@ -23,153 +25,66 @@ let Adw = null;
 try { Adw = imports.gi.Adw; } catch (e) {}
 
 let gOptions;
-let stackSwitcher;
-let stack;
-let windowWidget;
+let itemFactory;
+let pageList;
 
-const GENERAL_TITLE = _('General');
-const GENERAL_ICON = 'preferences-system-symbolic';
-const DASH_TITLE = _('Dash');
-const DASH_ICON = 'user-bookmarks-symbolic';
-const SEARCH_TITLE = _('Search');
-const SEARCH_ICON = 'edit-find-symbolic';
-const APPGRID_TITLE = _('App Grid');
-const APPGRID_ICON = 'view-app-grid-symbolic';
-const ABOUT_TITLE = _('About');
-const ABOUT_ICON = 'preferences-system-details-symbolic';
+// conversion of Gtk3 / Gtk4 widgets add methods
+const append = 'append';
+const set_child = 'set_child';
 
 function _newImageFromIconName(name) {
-    return Gtk.Image.new_from_icon_name(name);
+    const args = [name];
+    return Gtk.Image.new_from_icon_name(...args);
 }
-
 
 function init() {
     ExtensionUtils.initTranslations(Me.metadata['gettext-domain']);
     gOptions = new Settings.Options();
-}
 
-// this function is called by GS42 if available and returns libadwaita prefes window
-function fillPreferencesWindow(window) {
-    const overviewOptionsPage = getAdwPage(_getGeneralOptionList(), {
-        title: GENERAL_TITLE,
-        icon_name: GENERAL_ICON,
-    });
-    const dashOptionsPage = getAdwPage(_getDashOptionList(), {
-        title: DASH_TITLE,
-        icon_name: DASH_ICON
-    });
-    const appGridPage = getAdwPage(_getAppGridOptionList(), {
-        title: APPGRID_TITLE,
-        icon_name: APPGRID_ICON
-    });
-    const searchPage = getAdwPage(_getSearchOptionList(), {
-        title: SEARCH_TITLE,
-        icon_name: SEARCH_ICON
-    });
+    itemFactory = new ItemFactory(gOptions);
 
-    const aboutPage = _getAboutPage({
-        title: ABOUT_TITLE,
-        icon_name: ABOUT_ICON
-    });
-
-    window.add(overviewOptionsPage);
-    window.add(dashOptionsPage);
-    window.add(appGridPage);
-    window.add(searchPage);
-    window.add(aboutPage);
-
-    window.set_search_enabled(true);
-
-    windowWidget = window;
-
-    window.connect('close-request', _onDestroy);
-
-    const width = 800;
-    const height = 700;
-    window.set_default_size(width, height);
-
-    return window;
-}
-
-function _onDestroy() {
-    gOptions.destroy();
-    gOptions = null;
-    windowWidget = null;
-}
-
-
-// this function is called by GS prior to 42 and also by 42 if fillPreferencesWindow not available
-function buildPrefsWidget() {
-    const prefsWidget = new Gtk.Box({
-        orientation: Gtk.Orientation.VERTICAL,
-    });
-
-    stack = new Gtk.Stack({
-        hexpand: true
-    });
-
-    stackSwitcher = new Gtk.StackSwitcher({
-        halign: Gtk.Align.CENTER,
-        hexpand: true,
-    });
-
-    const context = stackSwitcher.get_style_context();
-    context.add_class('caption');
-
-    stackSwitcher.set_stack(stack);
-    stack.set_transition_duration(300);
-    stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
-
-    stack.add_named(getLegacyPage(_getGeneralOptionList()), 'general');
-    stack.add_named(getLegacyPage(_getDashOptionList()), 'dash');
-    stack.add_named(getLegacyPage(_getAppGridOptionList()), 'appgrid');
-    stack.add_named(getLegacyPage(_getSearchOptionList()), 'search');
-
-    const pagesBtns = [
-        [new Gtk.Label({ label: GENERAL_TITLE}), _newImageFromIconName(GENERAL_ICON, Gtk.IconSize.BUTTON)],
-        [new Gtk.Label({ label: DASH_TITLE}), _newImageFromIconName(DASH_ICON, Gtk.IconSize.BUTTON)],
-        [new Gtk.Label({ label: APPGRID_TITLE}), _newImageFromIconName(APPGRID_ICON, Gtk.IconSize.BUTTON)],
-        [new Gtk.Label({ label: SEARCH_TITLE}), _newImageFromIconName(SEARCH_ICON, Gtk.IconSize.BUTTON)],
-    ];
-
-    let stBtn = stackSwitcher.get_first_child ? stackSwitcher.get_first_child() : null;
-    for (let i = 0; i < pagesBtns.length; i++) {
-        const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 6, visible: true});
-        const icon = pagesBtns[i][1];
-        icon.margin_start = 30;
-        icon.margin_end = 30;
-        box.append(icon);
-        box.append(pagesBtns[i][0]);
-        if (stackSwitcher.get_children) {
-            stBtn = stackSwitcher.get_children()[i];
-            stBtn.add(box);
-        } else {
-            stBtn.set_child(box);
-            stBtn.visible = true;
-            stBtn = stBtn.get_next_sibling();
+    pageList = [
+        {
+            name: 'general',
+            title: _('General'),
+            iconName: 'preferences-system-symbolic',
+            optionList: _getGeneralOptionList()
+        },
+        {
+            name: 'dash',
+            title: _('Dash'),
+            iconName: 'user-bookmarks-symbolic',
+            optionList: _getDashOptionList()
+        },
+        {
+            name: 'search',
+            title: _('Search'),
+            iconName: 'edit-find-symbolic',
+            optionList: _getSearchOptionList()
+        },
+        {
+            name: 'appgrid',
+            title: _('App Grid'),
+            iconName: 'view-app-grid-symbolic',
+            optionList: _getAppGridOptionList()
+        },
+        {
+            name: 'about',
+            title: _('About'),
+            iconName: 'preferences-system-details-symbolic',
+            optionList: _getAboutOptionList()
         }
-    }
-
-    stack.show_all && stack.show_all();
-    stackSwitcher.show_all && stackSwitcher.show_all();
-
-    prefsWidget.append(stack);
-    prefsWidget.show_all && prefsWidget.show_all();
-
-    prefsWidget.connect('realize', (widget) => {
-        const window = widget.get_root ? widget.get_root() : widget.get_toplevel();
-        const width = 600;
-        const height = 700;
-        window.set_default_size(width, height);
-
-        const headerbar = window.get_titlebar();
-        headerbar.title_widget = stackSwitcher;
-
-        window.connect('close-request', _onDestroy);
-    });
-
-    return prefsWidget;
+    ];
 }
+
+function fillPreferencesWindow(window) {
+    return new AdwPrefs().getFilledWindow(window, pageList);
+}
+
+function buildPrefsWidget() {
+    return new LegacyPrefs().getPrefsWidget(pageList);
+}
+
 
 ///////////////////////////////////////////////////
 function getAdwPage(optionList, pageProperties = {}) {
@@ -533,62 +448,62 @@ function _getGeneralOptionList() {
     // [text, tooltip, widget, settings-variable, options for combo]
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Overview'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Shift Reorders Workspace'),
             _('Allows you to reorder the current workspace using Shift + Scroll or Shift + PageUP/PageDown keys.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'shiftReordersWs'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Ctrl + Space Activates Dash'),
             _('Pressing Ctrl + Space bar in the overview activates Dash. You can navigate between app icons using Tab, left/right arrow keys and activate the app using Space or Enter key.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'spaceActivatesDash'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Move Titles Into Windows'),
             _('Moves captions with window titles up into the window previews to make them more visible and associated with the window.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'moveTitlesIntoWindows'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Always Show Window Titles'),
             _('Window titles will always be visible, not only when you hover the mouse pointer over the window preview. Enable also previous option "Move Titles Into Windows" to make all titles visible.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'alwaysShowWindowTitles'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Hover Selects Window For Activation'),
             _('When active, window under the mouse pointer will be activated when leaving the Overview even without clicking. Press Super, place mouse pointer over a window, press Super again to activate it.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'hoverActivatesWindowOnLeave'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Show Workspace Label on Hover'),
             _('Each workspace thumbnail in the workspace switcher can show its index and name (if defined in the system settings) or name of its most recently used app in a caption on mouse hover. '),
-            _newComboBox(),
-            //_newDropDown(),
+            itemFactory.newComboBox(),
+            //itemFactory.newDropDown(),
             'showWsTmbLabels',
             [   [_('Disable'), 0],
                 [_('Index'), 1],
@@ -599,34 +514,34 @@ function _getGeneralOptionList() {
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Hovering Over WS Thumbnail Switches Workspace'),
             _('Just hover the mouse pointer over a workspace thumbnail to switch to the workspace, no clicking needed.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'wsTmbSwitchOnHover'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Show Wallpaper in Workspace Switcher Thumbnails'),
             _('Each workspace switcher thumbnail backround will show the current wallpaper (if not covered by windows).'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'showWsSwitcherBg'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Hot Corner'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Fullscreen Hot Corner'),
             _('Allows hot corner in fullscreen mode.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'fullscreenHotCorner'
         )
     );
@@ -641,25 +556,25 @@ function _getDashOptionList() {
     // [text, tooltip, widget, settings-variable, options for combo]
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Dash'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Shift + Click Moves App To Current Workspace'),
             _('Clicking on app icon while holding down the Shift key will move all windows of the app to the current workspace.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'dashShiftClickMovesAppToCurrentWs'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Hovering Over Icon Highlights App Windows'),
             _('When hovering mouse pointer over an app icon, overview will switch to the workspace with app window(s) (if needed), all app window previews will show their titles (enable option "Move Titles Into Windows" to see them all), the most recently used window will be marked by the close button and optionally the opacity of all other windows will be reduced. If option "Prefer Most Recently Used Window" is enabled, workspace will be switched to the one with the most recently used window of the app, even if there is another app window on the current workspace.'),
-            _newComboBox(),
+            itemFactory.newComboBox(),
             'dashHoverIconHighlitsWindows',
             [   [_('Disable'), 0],
                 [_('Window Titles'), 1],
@@ -669,18 +584,18 @@ function _getDashOptionList() {
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Scroll Switches App Windows Workspaces'),
             _("Scrolling over an app icon will move the overview to the next workspace that contains the app window. If the previous option is enabled, the opacity of other app window previews will be reduced to highlight windows of the app."),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'dashScrollSwitchesAppWindowsWs'
         )
     );
 
-    const showWindowsBeforeBtn = _newSwitch();
+    const showWindowsBeforeBtn = itemFactory.newSwitch();
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Show Windows Before Activation'),
             _('if the app you clicked on has more than one window and no [window / recently used window (depends on the following option)] is on the current workspace, the overview will move to the workspace with the target window and highlight app windows if hover highlighting is enabled. Next click activates the most recently used window on the workspace or you can choose another window, if any.'),
             showWindowsBeforeBtn,
@@ -688,11 +603,11 @@ function _getDashOptionList() {
         )
     );
 
-    const preferMruWinBtn = _newSwitch();
+    const preferMruWinBtn = itemFactory.newSwitch();
     showWindowsBeforeBtn.connect('notify::active', () => preferMruWinBtn.set_sensitive(showWindowsBeforeBtn.get_active()));
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Prefer Most Recently Used Window'),
             _('Tweak of the the previous option - the globally most recently used window will take precedence over the most recently used window of the current workspace.'),
             preferMruWinBtn,
@@ -705,34 +620,34 @@ function _getDashOptionList() {
     //-----------------------------------------------------------------------------------
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('App Icon Menu Items'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Force Quit'),
             _('Adds item that allows you to kill (-9) the app if needed.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'appMenuForceQuit'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Move App to Current Workspace'),
             _('Adds item that allows you to move all windows of the app to the current workspace.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'appMenuMoveAppToWs'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Close Windows on Current Workspace'),
             _('Adds item that allows you to close all windows of the app on the current workspace. This item appears only if at least one window is available'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'appMenuCloseWindowsOnCurrentWs'
         )
     );
@@ -747,17 +662,17 @@ function _getAppGridOptionList() {
     // [text, tooltip, widget, settings-variable, options for combo]
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Sorting'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Apps Order'),
             _('Choose sorting method for the app grid. Note that sorting by alphabet and usage ignores folders.'),
-            _newComboBox(),
-            //_newDropDown(),
+            itemFactory.newComboBox(),
+            //itemFactory.newDropDown(),
             'appGridOrder',
             [   [_('Default'), 0],
                 [_('Alphabetically'), 1],
@@ -767,25 +682,25 @@ function _getAppGridOptionList() {
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Content'),
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Include Dash Items'),
             _('Include favorite / running apps currently present in the Dash. This option works only for Alphabetical and By Usage sorting modes, Default mode stays untouched.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'appGridIncludeDash'
         )
     );
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Always Show Full App Names'),
             _('Dont elipsize app names.'),
-            _newSwitch(),
+            itemFactory.newSwitch(),
             'appGridFullNames'
         )
     );
@@ -799,14 +714,14 @@ function _getSearchOptionList() {
     // [text, tooltip, widget, settings-variable, options for combo]
 
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Window Search Provider'),
         )
     );
 
-    const wspSwitch = _newSwitch();
+    const wspSwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Enable Window Search Provider'),
             _('Activates built-in window search provider to add open windows to the search results. You can search app names and window titles. You can also use "wq " prefix to suppress results from other search providers. Search supports fuzzy matches, more weight has exact match and then windows from current workspace.'),
             wspSwitch,
@@ -814,9 +729,9 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspSpaceSwitch = _newSwitch();
+    const wspSpaceSwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Space Activates Window Search'),
             _('Pressing the Space bar in the Overview window picker pastes "wq: " prefix to the search entry to activate the search and suppress results from other search providers.'),
             wspSpaceSwitch,
@@ -824,9 +739,9 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspClickAppsIconSwitch = _newSwitch();
+    const wspClickAppsIconSwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Secondary Click On Show Apps Icon Activates Window Search'),
             _("Activate window search by right-clicking on Dash's Show Apps Icon."),
             wspClickAppsIconSwitch,
@@ -834,9 +749,9 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspFuzzySwitch = _newSwitch();
+    const wspFuzzySwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Enable Fuzzy Match'),
             _('Fuzzy match allows you to find "Firefox" even if you type "ffx". If fuzzy match disabled, you need enter exact patterns separated by a space, but in arbitrary order.'),
             wspFuzzySwitch,
@@ -844,9 +759,9 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspCommandSwitch = _newSwitch();
+    const wspCommandSwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Enable Commands in Search Entry'),
             _('You can use following commands separated by the space at the end of entered pattern:\n/x!   \t\t\t- close selected window\n/xa! \t\t\t- close all found windows\n/m[number] \t\t- (e.g. /m6) move selected window to workspace with given index\n/ma[number] \t- move all found windows to workspace with given index'),
             wspCommandSwitch,
@@ -854,9 +769,9 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspShiftSwitch = _newSwitch();
+    const wspShiftSwitch = itemFactory.newSwitch();
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Shift Moves Window to Current Workspace'),
             _('Hold down the Shift key while activating the selected search result to move the window to the curent workspace.'),
             wspShiftSwitch,
@@ -864,10 +779,10 @@ function _getSearchOptionList() {
         )
     );
 
-    const wspCtrlShiftSwitch = _newSwitch();
+    const wspCtrlShiftSwitch = itemFactory.newSwitch();
     //wspCtrlShiftSwitch.visible = false;
     optionList.push(
-        _optionsItem(
+        itemFactory.getRowWidget(
             _('Ctrl+Shift Moves All Windows to Current Workspace'),
             _('Hold down the Ctrl and Shift keys while activating the search result to move all found windows to the current workspace and activate the selected window.'),
             wspCtrlShiftSwitch,
@@ -891,116 +806,490 @@ function _getSearchOptionList() {
     return optionList;
 }
 
-///////////////////////////////////////////////////
+function _getAboutOptionList() {
+    const optionList = [];
 
-function _getAboutPage(pageProperties) {
-    const page = new Adw.PreferencesPage(pageProperties);
+    optionList.push(itemFactory.getRowWidget(
+        Me.metadata.name
+    ));
 
-    const aboutGroup = new Adw.PreferencesGroup({
-        title: Me.metadata.name,
-        hexpand: true,
-    });
+    optionList.push(itemFactory.getRowWidget(
+        _('Version'),
+        null,
+        itemFactory.newLabel(Me.metadata.version.toString()),
+    ));
 
-    const linksGroup = new Adw.PreferencesGroup({
-        title: _('Links'),
-        hexpand: true,
-    });
-
-    page.add(aboutGroup);
-    page.add(linksGroup);
-
-////////////////////////////////////////////////////
-
-    aboutGroup.add(_newAdwLabelRow({
-        title: _('Version'),
-        subtitle: _(''),
-        label: Me.metadata.version.toString()
-    }));
-
-    aboutGroup.add(_newResetRow({
-        title: _('Reset all options'),
-        subtitle: _('Set all options to default values.'),
-    }));
+    optionList.push(itemFactory.getRowWidget(
+        _('Reset all options'),
+        _('Set all options to default values.'),
+        itemFactory.newOptionsResetButton(),
+    ));
 
 
-    linksGroup.add(_newAdwLinkRow({
-        title: _('Homepage'),
-        subtitle: _('Source code and more info about this extension'),
-        uri: 'https://github.com/G-dH/overview-feature-pack'
-    }));
+    optionList.push(itemFactory.getRowWidget(
+        _('Links')
+    ));
 
-    linksGroup.add(_newAdwLinkRow({
-        title: _('Gome Extensions'),
-        subtitle: _('Rate and comment the extension on GNOME Extensions site.'),
-        uri: 'https://extensions.gnome.org/extension/5192',
-    }));
+    optionList.push(itemFactory.getRowWidget(
+        _('Homepage'),
+        _('Source code and more info about this extension'),
+        itemFactory.newLinkButton('https://github.com/G-dH/overview-feature-pack'),
+    ));
 
-    linksGroup.add(_newAdwLinkRow({
-        title: _('Report a bug or suggest new feature'),
-        subtitle: _(''),
-        uri: 'https://github.com/G-dH/overview-feature-pack/issues',
-    }));
+    optionList.push(itemFactory.getRowWidget(
+        _('Gome Extensions'),
+        _('Rate and comment the extension on GNOME Extensions site.'),
+        itemFactory.newLinkButton('https://extensions.gnome.org/extension/5192'),
+    ));
 
-    linksGroup.add(_newAdwLinkRow({
-        title: _('Buy Me a Coffee'),
-        subtitle: _('If you like this extension, you can help me with coffee expenses.'),
-        uri: 'https://buymeacoffee.com/georgdh'
-    }));
+    optionList.push(itemFactory.getRowWidget(
+        _('Report a bug or suggest new feature'),
+        null,
+        itemFactory.newLinkButton('https://github.com/G-dH/overview-feature-pack/issues'),
+    ));
 
-    return page;
+    optionList.push(itemFactory.getRowWidget(
+        _('Buy Me a Coffee'),
+        _('If you like this extension, you can help me with my coffee expenses.'),
+        itemFactory.newLinkButton('https://buymeacoffee.com/georgdh'),
+    ));
+
+    return optionList;
 }
 
-function _newAdwLabelRow(params) {
-    const label = new Gtk.Label({
-        label: params.label
-    });
+//----------------------------------------------------------
 
-    const actionRow = new Adw.ActionRow({
-        title: params.title,
-        subtitle: params.subtitle,
-    });
+const ItemFactory = class ItemFactory {
+    constructor(options) {
+        this._options = options;
+        this._settings = this._options._gsettings;
+    }
 
-    actionRow.add_suffix(label);
+    getRowWidget(text, caption, widget, variable, options = []) {
 
-    return actionRow;
-}
+        let item = [];
+        let label;
+        if (widget) {
+            label = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 4,
+                halign: Gtk.Align.START,
+                valign: Gtk.Align.CENTER,
+            });
+            const option = new Gtk.Label({
+                halign: Gtk.Align.START,
+            });
+            option.set_text(text);
+            label[append](option);
 
-function _newAdwLinkRow(params) {
-    const linkBtn = new Gtk.LinkButton({
-        uri: params.uri,
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER,
-    });
+            if (caption) {
+                const captionLabel = new Gtk.Label({
+                    halign: Gtk.Align.START,
+                    wrap: true,
+                    /*width_chars: 80,*/
+                    xalign: 0
+                })
+                const context = captionLabel.get_style_context();
+                context.add_class('dim-label');
+                context.add_class('caption');
+                captionLabel.set_text(caption);
+                label[append](captionLabel);
+            }
+            label._title = text;
+        } else {
+            label = text;
+        }
+        item.push(label);
+        item.push(widget);
 
-    const actionRow = new Adw.ActionRow({
-        title: params.title,
-        subtitle: params.subtitle,
-        activatable_widget: linkBtn
-    });
+        let key;
 
-    actionRow.add_suffix(linkBtn);
+        if (variable && this._options.options[variable]) {
+            const opt = this._options.options[variable];
+            key = opt[1];
+        }
 
-    return actionRow;
-}
+        if (widget) {
+            if (widget._is_switch) {
+                this._connectSwitch(widget, key, variable);
+            } else if (widget._is_spinbutton || widget._is_scale) {
+                this._connectSpinButton(widget, key, variable);
+            } else if (widget._is_combo_box) {
+                this._connectComboBox(widget, key, variable, options);
+            }
+        }
 
-function _newResetRow(params) {
-    const btn = new Gtk.Button({
-        icon_name: 'view-refresh-symbolic',
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER,
-    });
-    btn.connect('clicked', () => {
-        Object.keys(gOptions.options).forEach(key => {
-            gOptions.set(key, gOptions.getDefault(key));
+        return item;
+    }
+
+    _connectSwitch(widget, key, variable) {
+        this._settings.bind(key, widget, 'active', Gio.SettingsBindFlags.DEFAULT);
+    }
+
+    _connectSpinButton(widget, key, variable) {
+        this._settings.bind(key, widget.adjustment, 'value', Gio.SettingsBindFlags.DEFAULT);
+    }
+
+    _connectComboBox(widget, key, variable, options) {
+        let model = widget.get_model();
+        widget._comboMap = {};
+        for (const [label, value] of options) {
+            let iter;
+            model.set(iter = model.append(), [0, 1], [label, value]);
+            if (value === gOptions.get(variable)) {
+                widget.set_active_iter(iter);
+            }
+            widget._comboMap[value] = iter;
+        }
+        gOptions.connect(`changed::${key}`, () => {
+            widget.set_active_iter(widget._comboMap[gOptions.get(variable, true)]);
         });
-    });
+        widget.connect('changed', () => {
+            const [success, iter] = widget.get_active_iter();
 
-    const actionRow = new Adw.ActionRow({
-        title: params.title,
-        subtitle: params.subtitle,
-    });
+            if (!success) return;
 
-    actionRow.add_suffix(btn);
+            gOptions.set(variable, model.get_value(iter, 1));
+        });
+    }
 
-    return actionRow;
+    newSwitch() {
+        let sw = new Gtk.Switch({
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+        });
+        sw._is_switch = true;
+        return sw;
+    }
+
+    newSpinButton(adjustment) {
+        let spinButton = new Gtk.SpinButton({
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+            vexpand: false,
+            xalign: 0.5,
+        });
+        spinButton.set_adjustment(adjustment);
+        spinButton._is_spinbutton = true;
+        return spinButton;
+    }
+
+    newComboBox() {
+        const model = new Gtk.ListStore();
+        model.set_column_types([GObject.TYPE_STRING, GObject.TYPE_INT]);
+        const comboBox = new Gtk.ComboBox({
+            model,
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+        });
+        const renderer = new Gtk.CellRendererText();
+        comboBox.pack_start(renderer, true);
+        comboBox.add_attribute(renderer, 'text', 0);
+        comboBox._is_combo_box = true;
+        return comboBox;
+    }
+
+    newScale(adjustment) {
+        const scale = new Gtk.Scale({
+            orientation: Gtk.Orientation.HORIZONTAL,
+            draw_value:  true,
+            has_origin:  false,
+            value_pos:   Gtk.PositionType.LEFT,
+            digits:      0,
+            halign:      Gtk.Align.FILL,
+            valign:      Gtk.Align.CENTER,
+            hexpand:     true,
+            vexpand:     false,
+        });
+        scale.set_adjustment(adjustment);
+        scale._is_scale = true;
+        return scale;
+    }
+
+    newLabel(text = '') {
+        const label = new Gtk.Label({
+            label: text,
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+        });
+        label._activatable = false;
+        return label;
+    }
+
+    newLinkButton(uri) {
+        const linkBtn = new Gtk.LinkButton({
+            label: shellVersion < 42 ? 'Click Me!' : '',
+            uri,
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+        });
+        return linkBtn;
+    }
+
+    newOptionsResetButton() {
+        const btn = new Gtk.Button({
+            halign: Gtk.Align.END,
+            valign: Gtk.Align.CENTER,
+            hexpand: true,
+        });
+
+        btn.icon_name = 'view-refresh-symbolic';
+
+        btn.connect('clicked', () => {
+            Object.keys(gOptions.options).forEach(key => {
+                gOptions.set(key, gOptions.getDefault(key));
+            });
+        });
+        btn._activatable = false;
+        return btn;
+    }
 }
+
+const AdwPrefs = class {
+    constructor() {
+    }
+
+    getFilledWindow(window, pages) {
+        for (let page of pages) {
+            const title = page.title;
+            const icon_name = page.iconName;
+            const optionList = page.optionList;
+
+            window.add(
+                this._getAdwPage(optionList, {
+                    title,
+                    icon_name
+                })
+            );
+        }
+
+        window.set_search_enabled(true);
+
+        window.connect('close-request', () => {
+            gOptions.destroy();
+            gOptions = null;
+            itemFactory = null;
+            pageList = null;
+        });
+
+        window.set_default_size(800, 800);
+
+        return window;
+    }
+
+    _getAdwPage(optionList, pageProperties = {}) {
+        pageProperties.width_request = 840;
+        const page = new Adw.PreferencesPage(pageProperties);
+        let group;
+        for (let item of optionList) {
+            // label can be plain text for Section Title
+            // or GtkBox for Option
+            const option = item[0];
+            const widget = item[1];
+            if (!widget) {
+                if (group) {
+                    page.add(group);
+                }
+                group = new Adw.PreferencesGroup({
+                    title: option,
+                    hexpand: true,
+                    width_request: 700
+                });
+                continue;
+            }
+
+            const row = new Adw.ActionRow({
+                title: option._title,
+            });
+
+            const grid = new Gtk.Grid({
+                column_homogeneous: false,
+                column_spacing: 20,
+                margin_start: 8,
+                margin_end: 8,
+                margin_top: 8,
+                margin_bottom: 8,
+                hexpand: true,
+            })
+            /*for (let i of item) {
+                box[append](i);*/
+            grid.attach(option, 0, 0, 1, 1);
+            if (widget) {
+                grid.attach(widget, 1, 0, 1, 1);
+            }
+            row.set_child(grid);
+            if (widget._activatable === false) {
+                row.activatable = false;
+            } else {
+                row.activatable_widget = widget;
+            }
+            group.add(row);
+        }
+        page.add(group);
+        return page;
+    }
+}
+
+const LegacyPrefs = class {
+    constructor() {
+    }
+
+    getPrefsWidget(pages) {
+        const prefsWidget = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL
+        });
+        const stack = new Gtk.Stack({
+            hexpand: true
+        });
+        const stackSwitcher = new Gtk.StackSwitcher({
+            halign: Gtk.Align.CENTER,
+            hexpand: true
+        });
+
+        const context = stackSwitcher.get_style_context();
+        context.add_class('caption');
+
+        stackSwitcher.set_stack(stack);
+        stack.set_transition_duration(300);
+        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
+
+        const pageProperties = {
+            hscrollbar_policy: Gtk.PolicyType.NEVER,
+            vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+            vexpand: true,
+            hexpand: true,
+            visible: true
+        };
+
+        const pagesBtns = [];
+
+        for (let page of pages) {
+            const name = page.name;
+            const title = page.title;
+            const iconName = page.iconName;
+            const optionList = page.optionList;
+
+            stack.add_named(this._getLegacyPage(optionList, pageProperties), name);
+            pagesBtns.push(
+                [new Gtk.Label({ label: title}), _newImageFromIconName(iconName, Gtk.IconSize.BUTTON)]
+            );
+        }
+
+        let stBtn = stackSwitcher.get_first_child ? stackSwitcher.get_first_child() : null;
+        for (let i = 0; i < pagesBtns.length; i++) {
+            const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 6, visible: true});
+            const icon = pagesBtns[i][1];
+            icon.margin_start = 30;
+            icon.margin_end = 30;
+            box[append](icon);
+            box[append](pagesBtns[i][0]);
+            if (stackSwitcher.get_children) {
+                stBtn = stackSwitcher.get_children()[i];
+                stBtn.add(box);
+            } else {
+                stBtn.set_child(box);
+                stBtn.visible = true;
+                stBtn = stBtn.get_next_sibling();
+            }
+        }
+
+        stack.show_all && stack.show_all();
+        stackSwitcher.show_all && stackSwitcher.show_all();
+
+        prefsWidget[append](stack);
+        prefsWidget.connect('realize', (widget) => {
+            const window = widget.get_root ? widget.get_root() : widget.get_toplevel();
+            const width = 800;
+            const height = 800;
+            window.set_default_size(width, height);
+            const headerbar = window.get_titlebar();
+            headerbar.title_widget = stackSwitcher;
+
+            const signal = Gtk.get_major_version() === 3 ? 'destroy' : 'close-request';
+            window.connect(signal, () => {
+                gOptions.destroy();
+                gOptions = null;
+            });
+        });
+
+        prefsWidget.show_all && prefsWidget.show_all();
+
+        return prefsWidget;
+    }
+
+    _getLegacyPage(optionList, pageProperties) {
+        const page = new Gtk.ScrolledWindow(pageProperties);
+        const mainBox = new Gtk.Box({
+            orientation: Gtk.Orientation.VERTICAL,
+            spacing: 5,
+            homogeneous: false,
+            margin_start: 30,
+            margin_end: 30,
+            margin_top: 12,
+            margin_bottom: 12,
+        });
+
+        const context = page.get_style_context();
+        context.add_class('background');
+
+        let frame;
+        let frameBox;
+        for (let item of optionList) {
+            // label can be plain text for Section Title
+            // or GtkBox for Option
+            const option = item[0];
+            const widget = item[1];
+
+            if (!widget) {
+                const lbl = new Gtk.Label({
+                    label: option,
+                    xalign: 0,
+                    margin_bottom: 4
+                });
+
+                const context = lbl.get_style_context();
+                context.add_class('heading');
+
+                mainBox[append](lbl);
+
+                frame = new Gtk.Frame({
+                    margin_bottom: 16
+                });
+
+                frameBox = new Gtk.ListBox({
+                    selection_mode: null
+                });
+
+                mainBox[append](frame);
+                frame[set_child](frameBox);
+                continue;
+            }
+
+            const grid = new Gtk.Grid({
+                column_homogeneous: false,
+                column_spacing: 20,
+                margin_start: 8,
+                margin_end: 8,
+                margin_top: 8,
+                margin_bottom: 8,
+                hexpand: true
+            })
+
+            grid.attach(option, 0, 0, 5, 1);
+
+            if (widget) {
+                grid.attach(widget, 5, 0, 2, 1);
+            }
+            frameBox[append](grid);
+        }
+        page[set_child](mainBox);
+
+        return page;
+    }
+}
+
