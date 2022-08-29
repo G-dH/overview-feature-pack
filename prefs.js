@@ -28,9 +28,6 @@ let gOptions;
 let itemFactory;
 let pageList;
 
-// conversion of Gtk3 / Gtk4 widgets add methods
-const append = 'append';
-const set_child = 'set_child';
 
 function _newImageFromIconName(name) {
     const args = [name];
@@ -83,361 +80,6 @@ function fillPreferencesWindow(window) {
 
 function buildPrefsWidget() {
     return new LegacyPrefs().getPrefsWidget(pageList);
-}
-
-
-///////////////////////////////////////////////////
-function getAdwPage(optionList, pageProperties = {}) {
-    /*const groupWidth = 800;
-    pageProperties.width_request = groupWidth + 100;*/
-    const page = new Adw.PreferencesPage(pageProperties);
-    let group;
-    for (let item of optionList) {
-        // label can be plain text for Section Title
-        // or GtkBox for Option
-        const option = item[0];
-        const widget = item[1];
-
-        if (!widget) {
-            if (group) {
-                page.add(group);
-            }
-            group = new Adw.PreferencesGroup({
-                title: option,
-                hexpand: true,
-            });
-            continue;
-        }
-
-        const row = new Adw.PreferencesRow({
-            title: option._title,
-        });
-
-        const grid = new Gtk.Grid({
-            column_homogeneous: false,
-            column_spacing: 10,
-            margin_start: 8,
-            margin_end: 8,
-            margin_top: 8,
-            margin_bottom: 8,
-            hexpand: true,
-        })
-
-        grid.attach(option, 0, 0, 6, 1);
-        if (widget) {
-            grid.attach(widget, 6, 0, 3, 1);
-        }
-        row.set_child(grid);
-        group.add(row);
-    }
-    page.add(group);
-    return page;
-}
-
-function getLegacyPage(optionList) {
-    const page = new Gtk.ScrolledWindow({
-        hscrollbar_policy: Gtk.PolicyType.NEVER,
-        vscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
-        vexpand: true,
-        hexpand: true,
-    });
-
-    const context = page.get_style_context();
-    context.add_class('background');
-
-    const mainBox = new Gtk.Box({
-        orientation: Gtk.Orientation.VERTICAL,
-        spacing: 5,
-        homogeneous: false,
-        margin_start: 16,
-        margin_end: 16,
-        margin_top: 16,
-        margin_bottom: 16,
-    });
-
-    let frame;
-    let frameBox;
-
-    for (let item of optionList) {
-        // item structure: [labelBox, control widget]
-        const option = item[0];
-        const widget = item[1];
-        if (!widget) {
-            // new section
-            let lbl = new Gtk.Label({
-                xalign: 0,
-                margin_top: 4,
-                margin_bottom: 2
-            });
-            lbl.set_markup(option); // option is plain text if item is section title
-            mainBox.append(lbl);
-            frame = new Gtk.Frame({
-                margin_bottom: 10,
-            });
-            frameBox = new Gtk.ListBox({
-                selection_mode: null,
-            });
-            mainBox.append(frame);
-            frame.set_child(frameBox);
-            continue;
-        }
-        const grid = new Gtk.Grid({
-            column_homogeneous: true,
-            column_spacing: 10,
-            margin_start: 8,
-            margin_end: 8,
-            margin_top: 8,
-            margin_bottom: 8,
-            hexpand: true,
-        })
-
-        grid.attach(option, 0, 0, 6, 1);
-        if (widget) {
-            grid.attach(widget, 6, 0, 3, 1);
-        }
-
-        frameBox.append(grid);
-    }
-
-    page.set_child(mainBox);
-    page.show_all && page.show_all();
-
-    return page;
-}
-
-/////////////////////////////////////////////////////////////////////
-
-function _newSwitch() {
-    let sw = new Gtk.Switch({
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER,
-        hexpand: true,
-    });
-    sw.is_switch = true;
-    return sw;
-}
-
-function _newSpinButton(adjustment) {
-    let spinButton = new Gtk.SpinButton({
-        halign: Gtk.Align.END,
-        hexpand: true,
-        xalign: 0.5,
-    });
-    spinButton.set_adjustment(adjustment);
-    spinButton.is_spinbutton = true;
-    return spinButton;
-}
-
-function _newComboBox() {
-    const model = new Gtk.ListStore();
-    model.set_column_types([GObject.TYPE_STRING, GObject.TYPE_INT]);
-    const comboBox = new Gtk.ComboBox({
-        model,
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER,
-        hexpand: true,
-    });
-    const renderer = new Gtk.CellRendererText();
-    comboBox.pack_start(renderer, true);
-    comboBox.add_attribute(renderer, 'text', 0);
-    comboBox.is_combo_box = true;
-    return comboBox;
-}
-
-function _newEntry() {
-    const entry = new Gtk.Entry({
-        width_chars: 25,
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER,
-        hexpand: true,
-        xalign: 0,
-    });
-    entry.set_icon_from_icon_name(Gtk.EntryIconPosition.SECONDARY, 'edit-clear-symbolic');
-    entry.set_icon_activatable(Gtk.EntryIconPosition.SECONDARY, true);
-    entry.connect('icon-press', (e) => e.set_text(''));
-    entry.is_entry = true;
-    return entry;
-}
-
-function _newScale(adjustment) {
-    const scale = new Gtk.Scale({
-        orientation: Gtk.Orientation.HORIZONTAL,
-        draw_value:  true,
-        has_origin:  false,
-        value_pos:   Gtk.PositionType.LEFT,
-        digits:      0,
-        halign:      Gtk.Align.FILL,
-        valign:      Gtk.Align.CENTER,
-        hexpand:     true,
-        vexpand:     false,
-    });
-    scale.set_adjustment(adjustment);
-    scale.is_scale = true;
-    return scale;
-}
-
-function _newColorButton() {
-    const colorBtn = new Gtk.ColorButton({
-        hexpand: true,
-    });
-    colorBtn.set_use_alpha(true);
-    colorBtn.is_color_btn = true;
-
-    return colorBtn;
-}
-
-function _newColorResetBtn(colIndex, colorBtn) {
-    const colorReset = new Gtk.Button({
-        hexpand: false,
-        halign: Gtk.Align.END,
-    });
-    colorReset.set_tooltip_text(_('Reset color to default value'));
-
-    if (colorReset.set_icon_name) {
-        colorReset.set_icon_name('edit-clear-symbolic');
-    } else {
-        colorReset.add(Gtk.Image.new_from_icon_name('edit-clear-symbolic', Gtk.IconSize.BUTTON));
-    }
-    colorReset.connect('clicked', () =>{
-        const color = gOptions.get('defaultColors')[colIndex];
-        if (!color) return;
-        const rgba = colorBtn.get_rgba();
-        const success = rgba.parse(color);
-        if (success)
-            colorBtn.set_rgba(rgba);
-        gOptions.set(colorBtn._gsettingsVar, rgba.to_string());
-    });
-
-    return colorReset;
-}
-
-function _newColorButtonBox() {
-    const box = new Gtk.Box({
-        hexpand: true,
-        spacing: 4,
-    });
-
-    box.is_color_box = true;
-    return box;
-}
-
-function _newButton() {
-    const button = new Gtk.Button({
-        label: 'Apply',
-        hexpand: false,
-        vexpand: false,
-        halign: Gtk.Align.END,
-        valign: Gtk.Align.CENTER
-    });
-    button.is_button = true;
-
-    return button;
-}
-
-function _optionsItem(text, tooltip, widget, variable, options = []) {
-    let item = [];
-    let label;
-    if (widget) {
-        label = new Gtk.Box({
-            orientation: Gtk.Orientation.VERTICAL,
-            spacing: 4,
-            halign: Gtk.Align.START,
-            valign: Gtk.Align.CENTER,
-        });
-
-        label._title = text;
-        const option = new Gtk.Label({
-            halign: Gtk.Align.START,
-        });
-        option.set_markup(text);
-
-        label.append(option);
-
-        if (tooltip) {
-            const caption = new Gtk.Label({
-                halign: Gtk.Align.START,
-                wrap: true,
-                xalign: 0
-            })
-            const context = caption.get_style_context();
-            context.add_class('dim-label');
-            context.add_class('caption');
-            caption.set_text(tooltip);
-            label.append(caption);
-        }
-
-    } else {
-        label = text;
-    }
-    item.push(label);
-    item.push(widget);
-
-    let settings;
-    let key;
-
-    if (variable && gOptions.options[variable]) {
-        const opt = gOptions.options[variable];
-        key = opt[1];
-        settings = opt[2] ? opt[2]() : gOptions._gsettings;
-    }
-    if (widget && widget.is_switch) {
-        settings.bind(key, widget, 'active', Gio.SettingsBindFlags.DEFAULT);
-
-    } else if (widget && widget.is_combo_box) {
-        let model = widget.get_model();
-        for (const [label, value] of options) {
-            let iter;
-            model.set(iter = model.append(), [0, 1], [label, value]);
-        }
-        settings.bind(key, widget, 'active', Gio.SettingsBindFlags.DEFAULT);
-
-    } else if (widget && widget.is_entry) {
-        if (options) {
-            const names = gOptions.get(variable);
-            if (names[options - 1])
-                widget.set_text(names[options - 1]);
-
-            widget.set_placeholder_text(_('Workspace') + ` ${options}`);
-
-            widget.connect('changed', () => {
-                const names = [];
-                wsEntries.forEach(e => {
-                if (e.get_text())
-                    names.push(e.get_text());
-                })
-                gOptions.set('wsNames', names);
-            });
-
-            wsEntries.push(widget);
-        }
-
-    } else if (widget && widget.is_scale) {
-        settings.bind(key, widget.adjustment, 'value', Gio.SettingsBindFlags.DEFAULT);
-
-    } else if (widget && (widget.is_color_btn || widget.is_color_box)) {
-        let colorBtn;
-        if (widget.is_color_box) {
-            colorBtn = widget.colorBtn;
-        } else {
-            colorBtn = widget;
-        }
-        const rgba = colorBtn.get_rgba();
-        rgba.parse(gOptions.get(variable));
-        colorBtn.set_rgba(rgba);
-
-        colorBtn.connect('color_set', () => {
-            gOptions.set(variable, `${colorBtn.get_rgba().to_string()}`);
-        });
-
-        settings.connect(`changed::${key}`,() => {
-            const rgba = colorBtn.get_rgba();
-            rgba.parse(gOptions.get(variable));
-            colorBtn.set_rgba(rgba);
-        });
-
-    }
-
-    return item;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -880,7 +522,7 @@ const ItemFactory = class ItemFactory {
                 halign: Gtk.Align.START,
             });
             option.set_text(text);
-            label[append](option);
+            label.append(option);
 
             if (caption) {
                 const captionLabel = new Gtk.Label({
@@ -893,7 +535,7 @@ const ItemFactory = class ItemFactory {
                 context.add_class('dim-label');
                 context.add_class('caption');
                 captionLabel.set_text(caption);
-                label[append](captionLabel);
+                label.append(captionLabel);
             }
             label._title = text;
         } else {
@@ -1036,14 +678,14 @@ const ItemFactory = class ItemFactory {
             halign: Gtk.Align.END,
             valign: Gtk.Align.CENTER,
             hexpand: true,
+            css_classes: ['destructive-action'],
+            icon_name: 'view-refresh-symbolic'
         });
 
-        btn.icon_name = 'view-refresh-symbolic';
-
         btn.connect('clicked', () => {
-            Object.keys(gOptions.options).forEach(key => {
-                gOptions.set(key, gOptions.getDefault(key));
-            });
+            this._settings.list_keys().forEach(
+                key => settings.reset(key)
+            );
         });
         btn._activatable = false;
         return btn;
@@ -1117,7 +759,7 @@ const AdwPrefs = class {
                 hexpand: true,
             })
             /*for (let i of item) {
-                box[append](i);*/
+                box.append(i);*/
             grid.attach(option, 0, 0, 1, 1);
             if (widget) {
                 grid.attach(widget, 1, 0, 1, 1);
@@ -1186,8 +828,8 @@ const LegacyPrefs = class {
             const icon = pagesBtns[i][1];
             icon.margin_start = 30;
             icon.margin_end = 30;
-            box[append](icon);
-            box[append](pagesBtns[i][0]);
+            box.append(icon);
+            box.append(pagesBtns[i][0]);
             if (stackSwitcher.get_children) {
                 stBtn = stackSwitcher.get_children()[i];
                 stBtn.add(box);
@@ -1201,7 +843,7 @@ const LegacyPrefs = class {
         stack.show_all && stack.show_all();
         stackSwitcher.show_all && stackSwitcher.show_all();
 
-        prefsWidget[append](stack);
+        prefsWidget.append(stack);
         prefsWidget.connect('realize', (widget) => {
             const window = widget.get_root ? widget.get_root() : widget.get_toplevel();
             const width = 800;
@@ -1255,7 +897,7 @@ const LegacyPrefs = class {
                 const context = lbl.get_style_context();
                 context.add_class('heading');
 
-                mainBox[append](lbl);
+                mainBox.append(lbl);
 
                 frame = new Gtk.Frame({
                     margin_bottom: 16
@@ -1265,8 +907,8 @@ const LegacyPrefs = class {
                     selection_mode: null
                 });
 
-                mainBox[append](frame);
-                frame[set_child](frameBox);
+                mainBox.append(frame);
+                frame.set_child(frameBox);
                 continue;
             }
 
@@ -1285,11 +927,10 @@ const LegacyPrefs = class {
             if (widget) {
                 grid.attach(widget, 5, 0, 2, 1);
             }
-            frameBox[append](grid);
+            frameBox.append(grid);
         }
-        page[set_child](mainBox);
+        page.set_child(mainBox);
 
         return page;
     }
 }
-
