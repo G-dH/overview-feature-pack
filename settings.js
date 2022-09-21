@@ -54,7 +54,11 @@ var Options = class Options {
             wsTmbSwitchOnHover: ['boolean', 'ws-tmb-switch-on-hover'],
             appGridOrder: ['int', 'app-grid-order'],
             appGridIncludeDash: ['boolean', 'app-grid-fav-run'],
-            appGridFullNames: ['boolean', 'app-grid-full-names']
+            appGridColumns: ['int', 'app-grid-columns'],
+            appGridRows: ['int', 'app-grid-rows'],
+            appGridIconSize: ['int', 'app-grid-icon-size'],
+            appGridNamesMode: ['int', 'app-grid-names-mode'],
+            appGridIncompletePages: ['boolean', 'app-grid-incomplete-pages'],
         }
         this.cachedOptions = {};
     }

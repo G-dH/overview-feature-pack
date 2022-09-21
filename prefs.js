@@ -325,14 +325,14 @@ function _getAppGridOptionList() {
 
     optionList.push(
         itemFactory.getRowWidget(
-            _('Content'),
+            _('Behavior'),
         )
     );
 
     optionList.push(
         itemFactory.getRowWidget(
             _('Include Dash Items'),
-            _('Include favorite / running apps currently present in the Dash. This option works only for Alphabetical and By Usage sorting modes, Default mode stays untouched.'),
+            _('Include favorite / running apps currently present in the Dash in the app grid.'),
             itemFactory.newSwitch(),
             'appGridIncludeDash'
         )
@@ -340,12 +340,104 @@ function _getAppGridOptionList() {
 
     optionList.push(
         itemFactory.getRowWidget(
-            _('Always Show Full App Names'),
-            _('Dont elipsize app names.'),
+            _('Allow Incomplete Pages'),
+            _('If disabled, icons from the next page (if any) are automatically moved to fill any empty slot left after an icon was (re)moved (to a folder for exapmle).'),
             itemFactory.newSwitch(),
-            'appGridFullNames'
+            //itemFactory.newDropDown(),
+            'appGridIncompletePages'
         )
     );
+
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('Appearance'),
+        )
+    );
+
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('App Names Style'),
+            _('Choose how and when app names should be shown.'),
+            itemFactory.newComboBox(),
+            //itemFactory.newDropDown(),
+            'appGridNamesMode',
+            [   [_('Ellipsized - Expand Selected (Default)'), 0],
+                [_('Allways Expanded'), 1],
+                [_('Hidden - Show Selected Only'), 2],
+            ]
+        )
+    );
+
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('Icon Size'),
+            _('Allows to force fixed icon size and bypass the default adaptive algorithm.'),
+            itemFactory.newComboBox(),
+            //itemFactory.newDropDown(),
+            'appGridIconSize',
+            [   [_('Adaptive (Default)'), -1],
+                [_('128'), 128],
+                [_('112'), 112],
+                [_('96'), 96],
+                [_('72'), 72],
+                [_('64'), 64],
+                [_('48'), 48],
+                [_('32'), 32],
+            ]
+        )
+    );
+
+    const columnsAdjustment = new Gtk.Adjustment({
+        upper: 15,
+        lower: 2,
+        step_increment: 1,
+        page_increment: 1,
+    });
+
+    optionList.push(itemFactory.getRowWidget(
+        _('Columns per Page'),
+        _('Number of columns in application grid.'),
+        itemFactory.newSpinButton(columnsAdjustment),
+        'appGridColumns'
+    ));
+
+    const rowsAdjustment = new Gtk.Adjustment({
+        upper: 15,
+        lower: 2,
+        step_increment: 1,
+        page_increment: 1,
+    });
+
+    optionList.push(itemFactory.getRowWidget(
+        _('Rows per Page'),
+        _('Number of rows in application grid.'),
+        itemFactory.newSpinButton(rowsAdjustment),
+        'appGridRows'
+    ));
+
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('Reset'),
+        )
+    );
+
+    optionList.push(itemFactory.getRowWidget(
+        _('Reset App Grid Layout'),
+        _('Removes all stored app grid icons positions, after the reset icons will be orderd alphabetically.'),
+        itemFactory.newResetButton(() => {
+            const settings = ExtensionUtils.getSettings('org.gnome.shell');
+            settings.set_value('app-picker-layout', new GLib.Variant('aa{sv}', []));
+        }),
+    ));
+
+    optionList.push(itemFactory.getRowWidget(
+        _('Remove App Grid Folders'),
+        _('Removes all folders, folder apps move to root grid.'),
+        itemFactory.newResetButton(() => {
+            const settings = ExtensionUtils.getSettings('org.gnome.desktop.app-folders');
+            settings.set_strv('folder-children', []);
+        }),
+    ));
 
     return optionList;
 }
@@ -464,7 +556,11 @@ function _getAboutOptionList() {
     optionList.push(itemFactory.getRowWidget(
         _('Reset all options'),
         _('Set all options to default values.'),
-        itemFactory.newOptionsResetButton(),
+        itemFactory.newResetButton(() => {
+            this._settings.list_keys().forEach(
+                key => settings.reset(key)
+            );
+        }),
     ));
 
 
@@ -673,7 +769,7 @@ const ItemFactory = class ItemFactory {
         return linkBtn;
     }
 
-    newOptionsResetButton() {
+    newResetButton(callback) {
         const btn = new Gtk.Button({
             halign: Gtk.Align.END,
             valign: Gtk.Align.CENTER,
@@ -682,11 +778,7 @@ const ItemFactory = class ItemFactory {
             icon_name: 'view-refresh-symbolic'
         });
 
-        btn.connect('clicked', () => {
-            this._settings.list_keys().forEach(
-                key => settings.reset(key)
-            );
-        });
+        btn.connect('clicked', callback);
         btn._activatable = false;
         return btn;
     }

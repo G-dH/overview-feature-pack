@@ -9,13 +9,15 @@
 
 'use strict';
 
-const { Clutter, GLib, Meta, Shell, St, Pango, Graphene } = imports.gi;
+const { Clutter, GLib, Meta, Shell, St, Pango, Graphene, GObject } = imports.gi;
+
 const { AppMenu } = imports.ui.appMenu;
 const PopupMenu = imports.ui.popupMenu;
 const BoxPointer = imports.ui.boxpointer;
 const Layout = imports.ui.layout;
 const Main = imports.ui.main;
 const AppDisplay = imports.ui.appDisplay;
+const IconGrid = imports.ui.iconGrid;
 const Dash = imports.ui.dash;
 const OverviewControls = imports.ui.overviewControls;
 const WorkspacesView = imports.ui.workspacesView;
@@ -48,6 +50,7 @@ let _showAppsIconBtnPressId = 0;
 let _origAppDisplayAcceptDrop;
 let _origAppViewItemHandleDragOver;
 let _origAppViewItemAcceptDrop;
+let _appGridLayoutSettings;
 
 let SEARCH_WINDOWS_ENABLED;
 let SEARCH_WINDOWS_SPACE;
@@ -71,7 +74,11 @@ let WS_TMB_HOVER_SWITCH;
 let SHOW_WST_LABELS;
 let APP_GRID_ORDER;
 let APP_GRID_FAV_RUN;
-let APP_GRID_FULL_NAMES;
+let APP_GRID_COLUMNS;
+let APP_GRID_ROWS;
+let APP_GRID_ICON_SIZE;
+let APP_GRID_NAMES_MODE;
+let APP_GRID_ALLOW_INCOMPLETE_PAGES;
 
 let gOptions;
 
@@ -81,6 +88,7 @@ function activate() {
 
     gOptions.connect('changed', _updateSettings);
 
+    //AppDisplay.FolderGrid = FolderGrid;
     _updateSettings();
 }
 
@@ -147,7 +155,12 @@ function _updateSettings(settings, key) {
     APP_GRID_ORDER = gOptions.get('appGridOrder', true);
     APP_GRID_FAV_RUN = gOptions.get('appGridIncludeDash', true);
 
-    APP_GRID_FULL_NAMES = gOptions.get('appGridFullNames', true);
+    APP_GRID_NAMES_MODE = gOptions.get('appGridNamesMode', true);
+
+    APP_GRID_COLUMNS = gOptions.get('appGridColumns', true);
+    APP_GRID_ROWS = gOptions.get('appGridRows', true);
+    APP_GRID_ICON_SIZE = gOptions.get('appGridIconSize', true);
+    APP_GRID_ALLOW_INCOMPLETE_PAGES = gOptions.get('appGridIncompletePages', true);
 
 
     _updateWorkspacesDisplay();
@@ -160,7 +173,7 @@ function _updateSettings(settings, key) {
     _updateHotCorner();
     _updateWindowSearchProvider();
 
-    // update app icon labels in case APP_GRID_FULL_NAMES changed
+    // update app icon labels in case APP_GRID FULL_NAMES changed
     Main.overview._overview._controls._appDisplay._orderedItems.forEach(icon => icon._updateMultiline());
 }
 
@@ -216,7 +229,7 @@ function _updateAppIcon(reset = false) {
         _Util.overrideProto(AppDisplay.AppIcon.prototype, _featurePackOverrides['AppIcon']);
     }
 
-    if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS || APP_GRID_FULL_NAMES)) {
+    if (!reset && (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS || APP_GRID_NAMES_MODE)) {
         for (let name in _appIconInjections) {
             _Util.removeInjection(AppDisplay.AppIcon.prototype, _appIconInjections, name);
         }
@@ -253,8 +266,7 @@ function _updateHotCorner(reset = false) {
 }
 
 function _updateAppGrid(reset = false) {
-    const mode = APP_GRID_ORDER;
-    if (mode === 0 || reset) {
+    if (/*APP_GRID_ORDER === 0 ||*/ reset) {
         _Util.overrideProto(AppDisplay.AppDisplay.prototype, _featurePackOverrides['AppDisplay']);
         _Util.overrideProto(AppDisplay.BaseAppView.prototype, _featurePackOverrides['BaseAppView']);
         if (_appSystemStateSigId) {
@@ -268,25 +280,94 @@ function _updateAppGrid(reset = false) {
         if (_origAppViewItemAcceptDrop)
             AppDisplay.AppViewItem.prototype.acceptDrop = _origAppViewItemAcceptDrop;
 
-    } else if (!_appSystemStateSigId) {
-        _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
+    } else if (!_featurePackOverrides['BaseAppView']) {
         _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
-        _appSystemStateSigId = Shell.AppSystem.get_default().connect('app-state-changed', () => Main.overview._overview._controls._appDisplay._redisplay());
+        _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
+        if (APP_GRID_ORDER > 0 ) {
+            _appSystemStateSigId = Shell.AppSystem.get_default().connect('app-state-changed', () => Main.overview._overview._controls._appDisplay._redisplay());
 
-        // deny dnd from dash to appgrid
-        _origAppDisplayAcceptDrop = AppDisplay.AppDisplay.prototype.acceptDrop;
-        AppDisplay.AppDisplay.prototype.acceptDrop = function() { return false; };
-        // deny creating folders by dnd on other icon
-        _origAppViewItemHandleDragOver = AppDisplay.AppViewItem.prototype.handleDragOver;
-        _origAppViewItemAcceptDrop = AppDisplay.AppViewItem.prototype.acceptDrop;
-        AppDisplay.AppViewItem.prototype.handleDragOver = () => DND.DragMotionResult.NO_DROP;
-        AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
+            // deny dnd from dash to appgrid
+            _origAppDisplayAcceptDrop = AppDisplay.AppDisplay.prototype.acceptDrop;
+            AppDisplay.AppDisplay.prototype.acceptDrop = function() { return false; };
+            // deny creating folders by dnd on other icon
+            _origAppViewItemHandleDragOver = AppDisplay.AppViewItem.prototype.handleDragOver;
+            _origAppViewItemAcceptDrop = AppDisplay.AppViewItem.prototype.acceptDrop;
+            AppDisplay.AppViewItem.prototype.handleDragOver = () => DND.DragMotionResult.NO_DROP;
+            AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
+        }
     }
+
+    _updateAppGridGrid(reset);
+
     Main.overview._overview._controls._appDisplay._redisplay();
 }
 
+function _updateAppGridGrid(reset) {
+    // columns, rows, icon size
+    const appDisplay = Main.overview._overview._controls._appDisplay;
+    appDisplay.visible = true;
+
+    if (reset) {
+        appDisplay._grid.layout_manager.fixedIconSize = -1;
+        appDisplay._grid.setGridModes();
+        if (_appGridLayoutSettings) {
+            _appGridLayoutSettings = null;
+        }
+        if (_featurePackOverrides['FolderView']) {
+            _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
+            _featurePackOverrides['FolderView'] = null;
+        }
+    } else {
+        // update grid on layout reset
+        if (!_appGridLayoutSettings) {
+           _appGridLayoutSettings = ExtensionUtils.getSettings('org.gnome.shell');
+           _appGridLayoutSettings.connect('changed::app-picker-layout', _resetAppGrid);
+        }
+        // fixed icon size for folder icons
+        if (!_featurePackOverrides['FolderView']) {
+            _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
+        }
+
+        const updateGrid = function(rows, columns) {
+            appDisplay._grid._currentMode = -1;
+            appDisplay._grid.setGridModes(
+                [{ rows, columns }]
+            );
+            appDisplay._grid._setGridMode(0);
+        }
+
+        appDisplay._grid.layoutManager.fixedIconSize = APP_GRID_ICON_SIZE;
+        appDisplay._grid.layoutManager.allow_incomplete_pages = APP_GRID_ALLOW_INCOMPLETE_PAGES;
+
+        updateGrid(APP_GRID_ROWS, APP_GRID_COLUMNS);
+
+        // force rebuild icons. size doesn't matter
+        appDisplay.adaptToSize(...appDisplay._grid.get_size());
+
+        _resetAppGrid();
+    }
+
+    appDisplay._redisplay();
+
+}
+
+function _resetAppGrid(settings = null, key = null) {
+    if (settings) {
+        const currentValue = JSON.stringify(settings.get_value('app-picker-layout').deep_unpack());
+        const emptyValue = JSON.stringify([]);
+        if (key === 'app-picker-layout' && currentValue != emptyValue)
+            return;
+    }
+    const appDisplay = Main.overview._overview._controls._appDisplay;
+    const items = appDisplay._orderedItems;
+    for (let i = items.length - 1; i > -1; i--) {
+        Main.overview._overview._controls._appDisplay._removeItem(items[i]);
+    }
+    appDisplay._redisplay();
+}
+
 function _updateAppViewItem(reset = false) {
-    if (!reset && APP_GRID_FULL_NAMES) {
+    if (!reset && APP_GRID_NAMES_MODE) {
         _featurePackOverrides['AppViewItem'] = _Util.overrideProto(AppDisplay.AppViewItem.prototype, AppViewItemOverride);
     } else {
         _Util.overrideProto(AppDisplay.AppViewItem.prototype, _featurePackOverrides['AppViewItem']);
@@ -562,7 +643,6 @@ function _injectWindowPreview() {
                 //const iconOverlap = WindowPreview.ICON_SIZE * WindowPreview.ICON_OVERLAP;
                 // we cannot get propper title height before it gets to the stage, so 35 is estimated height + spacing
                 this._title.get_constraints()[1].offset = scaleFactor * (- iconOverlap - 35);
-                this.set_child_above_sibling(this._title, null);
             }
 
             if (ALWAYS_SHOW_WIN_TITLES) {
@@ -613,11 +693,11 @@ let WindowPreviewOverride = {
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
-        const ongoingTransition = this._title.get_transition('opacity');
+        /*const ongoingTransition = this._title.get_transition('opacity');
         if (animate &&
             ongoingTransition &&
             ongoingTransition.get_interval().peek_final_value() === 255)
-            return;
+            return;*/
 
         const toShow = this._windowCanClose()
             ? [this._closeButton]
@@ -666,11 +746,11 @@ let WindowPreviewOverride = {
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
-        const ongoingTransition = this._title.get_transition('opacity');
+        /*const ongoingTransition = this._title.get_transition('opacity');
         if (animate &&
             ongoingTransition &&
             ongoingTransition.get_interval().peek_final_value() === 0)
-            return;
+            return;*/
 
         const toHide = [this._closeButton];
 
@@ -703,19 +783,23 @@ let WindowPreviewOverride = {
     }
 }
 
-//----- AppIcon -----------------------------------------------------------------------
+//-----AppDisplay -----------------------------------------------------------------------
+
 function _injectAppIcon() {
     _appIconInjections['_init'] = _Util.injectToFunction(
         AppDisplay.AppIcon.prototype, '_init', function() {
             if (DASH_SCROLL_SWITCH_APP_WS || DASH_HOVER_HIGHLIGHT_WINS)
                 _connectAppIconScrollEnterLeave(null, null, this);
-            if (APP_GRID_FULL_NAMES && this.icon.label) {
+            if (APP_GRID_NAMES_MODE && this.icon.label) {
                 const clutterText = this.icon.label.clutterText;
                 clutterText.set({
                     line_wrap: true,
                     line_wrap_mode: Pango.WrapMode.WORD_CHAR,
                     ellipsize: Pango.EllipsizeMode.NONE,
                 });
+            }
+            if (APP_GRID_NAMES_MODE === 2 && this.icon.label) {
+                this.icon.label.opacity = 0;
             }
         }
     );
@@ -882,7 +966,38 @@ let AppDisplayOverride = {
 
         let appSys = Shell.AppSystem.get_default();
 
-        this._folderIcons = [];
+        const appsInsideFolders = new Set();
+        if (!APP_GRID_ORDER) {
+            this._folderIcons = [];
+
+            let folders = this._folderSettings.get_strv('folder-children');
+            folders.forEach(id => {
+                let path = `${this._folderSettings.path}folders/${id}/`;
+                let icon = this._items.get(id);
+                if (!icon) {
+                    icon = new AppDisplay.FolderIcon(id, path, this);
+                    icon.connect('apps-changed', () => {
+                        this._redisplay();
+                        this._savePages();
+                    });
+                    icon.connect('notify::pressed', () => {
+                        if (icon.pressed)
+                            this.updateDragFocus(icon);
+                    });
+                }
+
+                // Don't try to display empty folders
+                if (!icon.visible) {
+                    icon.destroy();
+                    return;
+                }
+
+                appIcons.push(icon);
+                this._folderIcons.push(icon);
+
+                icon.getAppIds().forEach(appId => appsInsideFolders.add(appId));
+            });
+        }
 
         // Allow dragging of the icon only if the Dash would accept a drop to
         // change favorite-apps. There are no other possible drop targets from
@@ -895,6 +1010,9 @@ let AppDisplayOverride = {
             global.settings.is_writable('app-picker-layout');
 
         apps.forEach(appId => {
+            if (!APP_GRID_ORDER && appsInsideFolders.has(appId))
+                return;
+
             let icon = this._items.get(appId);
             if (!icon) {
                 let app = appSys.lookup_app(appId);
@@ -929,6 +1047,7 @@ let BaseAppViewOverride = {
         let oldApps = this._orderedItems.slice();
         let oldAppIds = oldApps.map(icon => icon.id);
 
+
         let newApps = this._loadApps().sort(this._compareItems.bind(this));
         let newAppIds = newApps.map(icon => icon.id);
 
@@ -941,6 +1060,7 @@ let BaseAppViewOverride = {
             icon.destroy();
         });
 
+        // Add new app icons, or move existing ones
         newApps.forEach(icon => {
             const [page, position] = this._getItemPosition(icon);
             if (addedApps.includes(icon))
@@ -949,32 +1069,30 @@ let BaseAppViewOverride = {
                 this._moveItem(icon, page, position);
         });
 
-        // Add new app icons, or move existing ones
-        const { itemsPerPage } = this._grid;
-        let appIcons = this._orderedItems;
-
         // Reorder App Grid by usage
         // sort all alphabetically
-        if(APP_GRID_ORDER > 0)
+        if(APP_GRID_ORDER > 0) {
+            const { itemsPerPage } = this._grid;
+            let appIcons = this._orderedItems;
             appIcons.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-        // then sort used apps by usage
-        if (APP_GRID_ORDER === 2)
-            appIcons.sort((a, b) => Shell.AppUsage.get_default().compare(a.app.id, b.app.id));
-        // sort running first
-        appIcons.sort((a, b) => a.app.get_state() !== Shell.AppState.RUNNING && b.app.get_state() === Shell.AppState.RUNNING);
-        appIcons.forEach((icon, i) => {
-            const page = Math.floor(i / itemsPerPage);
-            const position = i % itemsPerPage;
-            this._moveItem(icon, page, position);
-        });
-        this._orderedItems = appIcons;
+            // then sort used apps by usage
+            if (APP_GRID_ORDER === 2)
+                appIcons.sort((a, b) => Shell.AppUsage.get_default().compare(a.app.id, b.app.id));
+            // sort running first
+            appIcons.sort((a, b) => a.app.get_state() !== Shell.AppState.RUNNING && b.app.get_state() === Shell.AppState.RUNNING);
+            appIcons.forEach((icon, i) => {
+                const page = Math.floor(i / itemsPerPage);
+                const position = i % itemsPerPage;
+                this._moveItem(icon, page, position);
+            });
+            this._orderedItems = appIcons;
+        }
 
         this.emit('view-loaded');
     },
 
     _canAccept: function(source) {
-        return false;
-        //return source instanceof AppViewItem;
+        return (APP_GRID_ORDER ? false : source instanceof AppDisplay.AppViewItem);
     }
 }
 
@@ -986,6 +1104,16 @@ let AppViewItemOverride = {
 
         const { label } = this.icon;
         const { clutterText } = label;
+
+        const isHighlighted = this.has_key_focus() || this.hover || this._forcedHighlight;
+
+        label.opacity = 255;
+        if (APP_GRID_NAMES_MODE === 2) {
+            label.opacity = isHighlighted ? 255 : 0;
+        }
+        if (isHighlighted)
+            this.get_parent().set_child_above_sibling(this, null);
+
         const layout = clutterText.get_layout();
         if (!layout.is_wrapped() && !layout.is_ellipsized())
             return;
@@ -997,7 +1125,8 @@ let AppViewItemOverride = {
             label.disconnect(id);
         });
 
-        const expand = APP_GRID_FULL_NAMES || this._forcedHighlight || this.hover || this.has_key_focus();
+        const expand = APP_GRID_NAMES_MODE > 0 || this._forcedHighlight || this.hover || this.has_key_focus();
+
         label.save_easing_state();
         label.set_easing_duration(expand
             ? AppDisplay.APP_ICON_TITLE_EXPAND_TIME
@@ -1007,6 +1136,17 @@ let AppViewItemOverride = {
             line_wrap_mode: expand ? Pango.WrapMode.WORD_CHAR : Pango.WrapMode.NONE,
             ellipsize: expand ? Pango.EllipsizeMode.NONE : Pango.EllipsizeMode.END,
         });
+    }
+}
+
+// force fixed icon size to app grid's folder view
+const FolderViewOverrides = {
+    _createGrid: function() {
+        const grid = new AppDisplay.FolderGrid();
+        if (APP_GRID_ICON_SIZE) {
+            grid.layoutManager.fixedIconSize = APP_GRID_ICON_SIZE;
+        }
+        return grid;
     }
 }
 
@@ -1280,7 +1420,11 @@ let WorkspaceThumbnailOverride = {
                     label += `: ${wsLabels[wsIndex]}`;
                 }
             } else if (SHOW_WST_LABELS === 3) { // 3- index + app name
-                const metaWin = global.display.get_tab_list(0, this.metaWorkspace).filter(w => w.get_monitor() === this.monitorIndex)[0];
+                // global.display.get_tab_list offers workspace filtering using the second argument, but...
+                // ... it sometimes includes windows from other workspaces, like minimized VBox machines, after shell restarts
+                const metaWin = global.display.get_tab_list(0, null).filter(
+                    w => w.get_monitor() === this.monitorIndex && w.get_workspace().index() === wsIndex
+                )[0];
 
                 if (metaWin) {
                     let tracker = Shell.WindowTracker.get_default();
@@ -1394,3 +1538,21 @@ function _getAppRecentWorkspace(app) {
 
     return null;
 }
+
+
+var FolderGrid = GObject.registerClass(
+class FolderGrid extends IconGrid.IconGrid {
+    _init() {
+        super._init({
+            allow_incomplete_pages: false,
+            columns_per_page: 10,
+            rows_per_page: 4,
+            page_halign: Clutter.ActorAlign.CENTER,
+            page_valign: Clutter.ActorAlign.CENTER,
+        });
+    }
+
+    adaptToSize(width, height) {
+        this.layout_manager.adaptToSize(width, height);
+    }
+});
