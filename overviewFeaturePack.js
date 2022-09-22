@@ -51,6 +51,7 @@ let _origAppDisplayAcceptDrop;
 let _origAppViewItemHandleDragOver;
 let _origAppViewItemAcceptDrop;
 let _appGridLayoutSettings;
+let _appGridLayoutSigId;
 
 let SEARCH_WINDOWS_ENABLED;
 let SEARCH_WINDOWS_SPACE;
@@ -79,6 +80,7 @@ let APP_GRID_ROWS;
 let APP_GRID_ICON_SIZE;
 let APP_GRID_NAMES_MODE;
 let APP_GRID_ALLOW_INCOMPLETE_PAGES;
+let APP_GRID_ALLOW_CUSTOM;
 
 let gOptions;
 
@@ -161,6 +163,7 @@ function _updateSettings(settings, key) {
     APP_GRID_ROWS = gOptions.get('appGridRows', true);
     APP_GRID_ICON_SIZE = gOptions.get('appGridIconSize', true);
     APP_GRID_ALLOW_INCOMPLETE_PAGES = gOptions.get('appGridIncompletePages', true);
+    APP_GRID_ALLOW_CUSTOM = gOptions.get('appGridAllowCustom', true);
 
 
     _updateWorkspacesDisplay();
@@ -266,89 +269,115 @@ function _updateHotCorner(reset = false) {
 }
 
 function _updateAppGrid(reset = false) {
-    if (/*APP_GRID_ORDER === 0 ||*/ reset) {
-        _Util.overrideProto(AppDisplay.AppDisplay.prototype, _featurePackOverrides['AppDisplay']);
-        _Util.overrideProto(AppDisplay.BaseAppView.prototype, _featurePackOverrides['BaseAppView']);
+    if (reset) {
+        if (_featurePackOverrides['AppDisplay']) {
+            _Util.overrideProto(AppDisplay.AppDisplay.prototype, _featurePackOverrides['AppDisplay']);
+            _featurePackOverrides['AppDisplay'] = null;
+        }
+        if (_featurePackOverrides['BaseAppView']) {
+            _Util.overrideProto(AppDisplay.BaseAppView.prototype, _featurePackOverrides['BaseAppView']);
+            _featurePackOverrides['BaseAppView'] = null;
+        }
+
+        if (_featurePackOverrides['FolderView']) {
+            _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
+            _featurePackOverrides['FolderView'] = null;
+        }
+    } else if (!_featurePackOverrides['BaseAppView']) {
+        // redisplay(), canAccept()
+        _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
+        // loadApps(), ensureDefaultFolders()
+        _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
+        // fixed icon size for folder icons
+        if (shellVersion < 43) {
+            _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
+        }
+    }
+
+    if (!APP_GRID_ORDER || reset) {
         if (_appSystemStateSigId) {
             Shell.AppSystem.get_default().disconnect(_appSystemStateSigId);
             _appSystemStateSigId = 0;
         }
         if (_origAppDisplayAcceptDrop)
             AppDisplay.AppDisplay.prototype.acceptDrop = _origAppDisplayAcceptDrop;
+
         if (_origAppViewItemHandleDragOver)
             AppDisplay.AppViewItem.prototype.handleDragOver = _origAppViewItemHandleDragOver;
+
         if (_origAppViewItemAcceptDrop)
             AppDisplay.AppViewItem.prototype.acceptDrop = _origAppViewItemAcceptDrop;
-
-    } else if (!_featurePackOverrides['BaseAppView']) {
-        _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
-        _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
-        if (APP_GRID_ORDER > 0 ) {
+    } else {
+        if (!_appSystemStateSigId)
             _appSystemStateSigId = Shell.AppSystem.get_default().connect('app-state-changed', () => Main.overview._overview._controls._appDisplay._redisplay());
 
-            // deny dnd from dash to appgrid
+        // deny dnd from dash to appgrid
+        if (!_origAppDisplayAcceptDrop)
             _origAppDisplayAcceptDrop = AppDisplay.AppDisplay.prototype.acceptDrop;
-            AppDisplay.AppDisplay.prototype.acceptDrop = function() { return false; };
-            // deny creating folders by dnd on other icon
+        AppDisplay.AppDisplay.prototype.acceptDrop = function() { return false; };
+
+        // deny creating folders by dnd on other icon
+        if (!_origAppViewItemHandleDragOver)
             _origAppViewItemHandleDragOver = AppDisplay.AppViewItem.prototype.handleDragOver;
+        AppDisplay.AppViewItem.prototype.handleDragOver = () => DND.DragMotionResult.NO_DROP;
+
+        if (!_origAppViewItemAcceptDrop)
             _origAppViewItemAcceptDrop = AppDisplay.AppViewItem.prototype.acceptDrop;
-            AppDisplay.AppViewItem.prototype.handleDragOver = () => DND.DragMotionResult.NO_DROP;
-            AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
-        }
+        AppDisplay.AppViewItem.prototype.acceptDrop = () => false;
     }
 
-    _updateAppGridGrid(reset);
+    _updateAppGridProperties(reset);
 
     Main.overview._overview._controls._appDisplay._redisplay();
 }
 
-function _updateAppGridGrid(reset) {
+function _updateAppGridProperties(reset) {
     // columns, rows, icon size
     const appDisplay = Main.overview._overview._controls._appDisplay;
     appDisplay.visible = true;
 
     if (reset) {
         appDisplay._grid.layout_manager.fixedIconSize = -1;
+        appDisplay._grid.layoutManager.allow_incomplete_pages = true;
         appDisplay._grid.setGridModes();
         if (_appGridLayoutSettings) {
+            _appGridLayoutSettings.disconnect(_appGridLayoutSigId);
+            _appGridLayoutSigId = null;
             _appGridLayoutSettings = null;
-        }
-        if (_featurePackOverrides['FolderView']) {
-            _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
-            _featurePackOverrides['FolderView'] = null;
         }
     } else {
         // update grid on layout reset
         if (!_appGridLayoutSettings) {
            _appGridLayoutSettings = ExtensionUtils.getSettings('org.gnome.shell');
-           _appGridLayoutSettings.connect('changed::app-picker-layout', _resetAppGrid);
-        }
-        // fixed icon size for folder icons
-        if (!_featurePackOverrides['FolderView']) {
-            _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
+           _appGridLayoutSigId = _appGridLayoutSettings.connect('changed::app-picker-layout', _resetAppGrid);
         }
 
+        //_resetAppGrid();
+
         const updateGrid = function(rows, columns) {
-            appDisplay._grid._currentMode = -1;
-            appDisplay._grid.setGridModes(
-                [{ rows, columns }]
-            );
+            if (rows === -1 || columns === -1) {
+                appDisplay._grid.setGridModes();
+            } else {
+                appDisplay._grid.setGridModes(
+                    [{ rows, columns }]
+                );
+            }
             appDisplay._grid._setGridMode(0);
         }
 
+        appDisplay._grid._currentMode = -1;
+        if (APP_GRID_ALLOW_CUSTOM) {
+            updateGrid(APP_GRID_ROWS, APP_GRID_COLUMNS);
+        } else {
+            appDisplay._grid.setGridModes();
+            updateGrid(-1, -1);
+        }
         appDisplay._grid.layoutManager.fixedIconSize = APP_GRID_ICON_SIZE;
         appDisplay._grid.layoutManager.allow_incomplete_pages = APP_GRID_ALLOW_INCOMPLETE_PAGES;
 
-        updateGrid(APP_GRID_ROWS, APP_GRID_COLUMNS);
-
-        // force rebuild icons. size doesn't matter
-        appDisplay.adaptToSize(...appDisplay._grid.get_size());
-
-        _resetAppGrid();
+        // force rebuild icons. size shouldn't be the same as the current one, otherwise can be arbitrary
+        appDisplay._grid.layoutManager.adaptToSize(200, 200);
     }
-
-    appDisplay._redisplay();
-
 }
 
 function _resetAppGrid(settings = null, key = null) {
@@ -363,7 +392,9 @@ function _resetAppGrid(settings = null, key = null) {
     for (let i = items.length - 1; i > -1; i--) {
         Main.overview._overview._controls._appDisplay._removeItem(items[i]);
     }
-    appDisplay._redisplay();
+    // redisplay only from callback
+    if (settings)
+        appDisplay._redisplay();
 }
 
 function _updateAppViewItem(reset = false) {
@@ -951,6 +982,10 @@ let AppIconOverride = {
 }
 
 let AppDisplayOverride = {
+    _ensureDefaultFolders: function() {
+        // disable creation of default folders if user deleted them
+    },
+
     _loadApps: function() {
         let appIcons = [];
         this._appInfoList = Shell.AppSystem.get_default().get_installed().filter(appInfo => {
@@ -1047,7 +1082,6 @@ let BaseAppViewOverride = {
         let oldApps = this._orderedItems.slice();
         let oldAppIds = oldApps.map(icon => icon.id);
 
-
         let newApps = this._loadApps().sort(this._compareItems.bind(this));
         let newAppIds = newApps.map(icon => icon.id);
 
@@ -1079,7 +1113,7 @@ let BaseAppViewOverride = {
             if (APP_GRID_ORDER === 2)
                 appIcons.sort((a, b) => Shell.AppUsage.get_default().compare(a.app.id, b.app.id));
             // sort running first
-            appIcons.sort((a, b) => a.app.get_state() !== Shell.AppState.RUNNING && b.app.get_state() === Shell.AppState.RUNNING);
+            //appIcons.sort((a, b) => a.app.get_state() !== Shell.AppState.RUNNING && b.app.get_state() === Shell.AppState.RUNNING);
             appIcons.forEach((icon, i) => {
                 const page = Math.floor(i / itemsPerPage);
                 const position = i % itemsPerPage;

@@ -59,6 +59,7 @@ var Options = class Options {
             appGridIconSize: ['int', 'app-grid-icon-size'],
             appGridNamesMode: ['int', 'app-grid-names-mode'],
             appGridIncompletePages: ['boolean', 'app-grid-incomplete-pages'],
+            appGridAllowCustom: ['boolean', 'app-grid-allow-custom'],
         }
         this.cachedOptions = {};
     }

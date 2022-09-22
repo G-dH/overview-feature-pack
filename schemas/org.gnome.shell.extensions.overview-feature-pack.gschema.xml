@@ -95,5 +95,8 @@
     <key type="b" name="app-grid-incomplete-pages">
       <default>true</default>
     </key>
+    <key type="b" name="app-grid-allow-custom">
+      <default>false</default>
+    </key>
   </schema>
 </schemalist>

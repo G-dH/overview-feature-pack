@@ -311,14 +311,14 @@ function _getAppGridOptionList() {
 
     optionList.push(
         itemFactory.getRowWidget(
-            _('Apps Order'),
-            _('Choose sorting method for the app grid. Note that sorting by alphabet and usage ignores folders.'),
+            _('Sort Key'),
+            _('Choose the sort method for the the app grid. The "Custom" option allows you to manually change the order of icons and create folders. Nota that sorting by alphabet and usage does not allow you to manage folders.'),
             itemFactory.newComboBox(),
             //itemFactory.newDropDown(),
             'appGridOrder',
-            [   [_('Default'), 0],
-                [_('Alphabetically'), 1],
-                [_('By Usage'), 2],
+            [   [_('Custom (Default)'), 0],
+                [_('Alphabet'), 1],
+                [_('Usage'), 2],
             ]
         )
     );
@@ -379,11 +379,22 @@ function _getAppGridOptionList() {
                 [_('128'), 128],
                 [_('112'), 112],
                 [_('96'), 96],
-                [_('72'), 72],
+                [_('80'), 80],
                 [_('64'), 64],
                 [_('48'), 48],
                 [_('32'), 32],
             ]
+        )
+    );
+
+    const customGridSwitch = itemFactory.newSwitch();
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('Enable Custom Grid Size'),
+            _('Apply following grid parameters.'),
+            customGridSwitch,
+            //itemFactory.newDropDown(),
+            'appGridAllowCustom'
         )
     );
 
@@ -394,10 +405,11 @@ function _getAppGridOptionList() {
         page_increment: 1,
     });
 
+    const columnsSpinBtn = itemFactory.newSpinButton(columnsAdjustment);
     optionList.push(itemFactory.getRowWidget(
         _('Columns per Page'),
         _('Number of columns in application grid.'),
-        itemFactory.newSpinButton(columnsAdjustment),
+        columnsSpinBtn,
         'appGridColumns'
     ));
 
@@ -408,12 +420,23 @@ function _getAppGridOptionList() {
         page_increment: 1,
     });
 
+    const rowsSpinBtn = itemFactory.newSpinButton(rowsAdjustment);
     optionList.push(itemFactory.getRowWidget(
         _('Rows per Page'),
         _('Number of rows in application grid.'),
-        itemFactory.newSpinButton(rowsAdjustment),
+        rowsSpinBtn,
         'appGridRows'
     ));
+
+    const _setOptionsSensitivity = () => {
+        columnsSpinBtn.sensitive = customGridSwitch.active;
+        rowsSpinBtn.sensitive = customGridSwitch.active;
+    };
+    _setOptionsSensitivity();
+    customGridSwitch.connect('notify::active', () => {
+        _setOptionsSensitivity();
+    });
+
 
     optionList.push(
         itemFactory.getRowWidget(
@@ -554,8 +577,8 @@ function _getAboutOptionList() {
     ));
 
     optionList.push(itemFactory.getRowWidget(
-        _('Reset all options'),
-        _('Set all options to default values.'),
+        _('Reset All Options'),
+        _('Set all options to their default values.'),
         itemFactory.newResetButton(() => {
             this._settings.list_keys().forEach(
                 key => settings.reset(key)
