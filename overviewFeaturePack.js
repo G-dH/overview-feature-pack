@@ -78,6 +78,7 @@ let APP_GRID_FAV_RUN;
 let APP_GRID_COLUMNS;
 let APP_GRID_ROWS;
 let APP_GRID_ICON_SIZE;
+let APP_GRID_FOLDER_ICON_SIZE;
 let APP_GRID_NAMES_MODE;
 let APP_GRID_ALLOW_INCOMPLETE_PAGES;
 let APP_GRID_ALLOW_CUSTOM;
@@ -162,6 +163,7 @@ function _updateSettings(settings, key) {
     APP_GRID_COLUMNS = gOptions.get('appGridColumns', true);
     APP_GRID_ROWS = gOptions.get('appGridRows', true);
     APP_GRID_ICON_SIZE = gOptions.get('appGridIconSize', true);
+    APP_GRID_FOLDER_ICON_SIZE = gOptions.get('appGridFolderIconSize', true);
     APP_GRID_ALLOW_INCOMPLETE_PAGES = gOptions.get('appGridIncompletePages', true);
     APP_GRID_ALLOW_CUSTOM = gOptions.get('appGridAllowCustom', true);
 
@@ -283,15 +285,17 @@ function _updateAppGrid(reset = false) {
             _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
             _featurePackOverrides['FolderView'] = null;
         }
+        if (_featurePackOverrides['FolderView']) {
+            _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
+            _featurePackOverrides['FolderView'] = null;
+        }
     } else if (!_featurePackOverrides['BaseAppView']) {
         // redisplay(), canAccept()
         _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
         // loadApps(), ensureDefaultFolders()
         _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
         // fixed icon size for folder icons
-        if (shellVersion < 43) {
-            _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
-        }
+        _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
     }
 
     if (!APP_GRID_ORDER || reset) {
@@ -352,7 +356,7 @@ function _updateAppGridProperties(reset) {
            _appGridLayoutSigId = _appGridLayoutSettings.connect('changed::app-picker-layout', _resetAppGrid);
         }
 
-        //_resetAppGrid();
+        _resetAppGrid();
 
         const updateGrid = function(rows, columns) {
             if (rows === -1 || columns === -1) {
@@ -1002,8 +1006,8 @@ let AppDisplayOverride = {
         let appSys = Shell.AppSystem.get_default();
 
         const appsInsideFolders = new Set();
+        this._folderIcons = [];
         if (!APP_GRID_ORDER) {
-            this._folderIcons = [];
 
             let folders = this._folderSettings.get_strv('folder-children');
             folders.forEach(id => {
@@ -1069,8 +1073,8 @@ let AppDisplayOverride = {
         const runningIDs = Shell.AppSystem.get_default().get_running().map(app => app.get_id());
 
         // remove running apps
-        if (!APP_GRID_FAV_RUN) {
-            appIcons = appIcons.filter((icon) => icon.app && !(runningIDs.includes(icon.app.id) || this._appFavorites.isFavorite(icon.id)));
+        if (!APP_GRID_FAV_RUN) { // !icon.app means folder
+            appIcons = appIcons.filter((icon) => this._folderIcons.includes(icon) || !(runningIDs.includes(icon.app.id) || this._appFavorites.isFavorite(icon.id)));
         }
 
         return appIcons;
@@ -1143,7 +1147,7 @@ let AppViewItemOverride = {
 
         label.opacity = 255;
         if (APP_GRID_NAMES_MODE === 2) {
-            label.opacity = isHighlighted ? 255 : 0;
+            label.opacity = (isHighlighted || !this.app) ? 255 : 0;
         }
         if (isHighlighted)
             this.get_parent().set_child_above_sibling(this, null);
@@ -1159,7 +1163,7 @@ let AppViewItemOverride = {
             label.disconnect(id);
         });
 
-        const expand = APP_GRID_NAMES_MODE > 0 || this._forcedHighlight || this.hover || this.has_key_focus();
+        const expand = APP_GRID_NAMES_MODE == 1 || this._forcedHighlight || this.hover || this.has_key_focus();
 
         label.save_easing_state();
         label.set_easing_duration(expand
@@ -1177,9 +1181,7 @@ let AppViewItemOverride = {
 const FolderViewOverrides = {
     _createGrid: function() {
         const grid = new AppDisplay.FolderGrid();
-        if (APP_GRID_ICON_SIZE) {
-            grid.layoutManager.fixedIconSize = APP_GRID_ICON_SIZE;
-        }
+        grid.layoutManager.fixedIconSize = APP_GRID_FOLDER_ICON_SIZE;
         return grid;
     }
 }

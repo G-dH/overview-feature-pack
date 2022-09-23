@@ -311,8 +311,8 @@ function _getAppGridOptionList() {
 
     optionList.push(
         itemFactory.getRowWidget(
-            _('Sort Key'),
-            _('Choose the sort method for the the app grid. The "Custom" option allows you to manually change the order of icons and create folders. Nota that sorting by alphabet and usage does not allow you to manage folders.'),
+            _('Order By'),
+            _('Choose an order of the app grid icons. The "Custom" option allows you to manually change the order of icons and create folders. Options "Alphabet" and "Usage" do not allow you to manage folders and ignore existing ones.'),
             itemFactory.newComboBox(),
             //itemFactory.newDropDown(),
             'appGridOrder',
@@ -371,10 +371,29 @@ function _getAppGridOptionList() {
     optionList.push(
         itemFactory.getRowWidget(
             _('Icon Size'),
-            _('Allows to force fixed icon size and bypass the default adaptive algorithm.'),
+            _('Allows to disable the default adaptive algorithm and set a fixed icon size.'),
             itemFactory.newComboBox(),
             //itemFactory.newDropDown(),
             'appGridIconSize',
+            [   [_('Adaptive (Default)'), -1],
+                [_('128'), 128],
+                [_('112'), 112],
+                [_('96'), 96],
+                [_('80'), 80],
+                [_('64'), 64],
+                [_('48'), 48],
+                [_('32'), 32],
+            ]
+        )
+    );
+
+    optionList.push(
+        itemFactory.getRowWidget(
+            _('Folder Icon Size'),
+            _('Allows to disable the default adaptive algorithm and set a fixed size of icons inside folders.'),
+            itemFactory.newComboBox(),
+            //itemFactory.newDropDown(),
+            'appGridFolderIconSize',
             [   [_('Adaptive (Default)'), -1],
                 [_('128'), 128],
                 [_('112'), 112],
@@ -455,7 +474,7 @@ function _getAppGridOptionList() {
 
     optionList.push(itemFactory.getRowWidget(
         _('Remove App Grid Folders'),
-        _('Removes all folders, folder apps move to root grid.'),
+        _('Removes all folders and moves all app icons to the root grid.'),
         itemFactory.newResetButton(() => {
             const settings = ExtensionUtils.getSettings('org.gnome.desktop.app-folders');
             settings.set_strv('folder-children', []);

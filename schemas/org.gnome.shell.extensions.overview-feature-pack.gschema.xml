@@ -87,7 +87,10 @@
       <default>0</default>
     </key>
     <key type="i" name="app-grid-icon-size">
-      <default>96</default>
+      <default>-1</default>
+    </key>
+    <key type="i" name="app-grid-folder-icon-size">
+      <default>-1</default>
     </key>
     <key type="i" name="app-grid-names-mode">
       <default>0</default>
