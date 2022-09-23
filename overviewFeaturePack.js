@@ -289,6 +289,9 @@ function _updateAppGrid(reset = false) {
             _Util.overrideProto(AppDisplay.FolderView.prototype, _featurePackOverrides['FolderView']);
             _featurePackOverrides['FolderView'] = null;
         }
+        if (_featurePackOverrides['IconGrid']) {
+            _Util.overrideProto(IconGrid.IconGrid.prototype, _featurePackOverrides['IconGrid']);
+        }
     } else if (!_featurePackOverrides['BaseAppView']) {
         // redisplay(), canAccept()
         _featurePackOverrides['BaseAppView'] = _Util.overrideProto(AppDisplay.BaseAppView.prototype, BaseAppViewOverride);
@@ -296,6 +299,9 @@ function _updateAppGrid(reset = false) {
         _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
         // fixed icon size for folder icons
         _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
+        if (shellVersion >= 43) {
+            _featurePackOverrides['IconGrid'] = _Util.overrideProto(IconGrid.IconGrid.prototype, IconGridOverrides);
+        }
     }
 
     if (!APP_GRID_ORDER || reset) {
@@ -1186,6 +1192,18 @@ const FolderViewOverrides = {
     }
 }
 
+// workaroung - silence page -2 error on gnome 43 during cleaning appgrid
+const IconGridOverrides = {
+    getItemsAtPage: function(page) {
+        if (page < 0 || page > this.nPages)
+            return [];
+            //throw new Error(`Page ${page} does not exist at IconGrid`);
+
+        const layoutManager = this.layout_manager;
+        return layoutManager.getItemsAtPage(page);
+    }
+}
+
 // this function switches workspaces with windows of the scrolled app and lowers opacity of other windows in the overview to quickly find its windows
 function _connectAppIconScrollEnterLeave(app, something, appIcon = null) {
     appIcon = appIcon ? appIcon : this;
@@ -1575,7 +1593,7 @@ function _getAppRecentWorkspace(app) {
     return null;
 }
 
-
+// not used at the moment. custom folder size
 var FolderGrid = GObject.registerClass(
 class FolderGrid extends IconGrid.IconGrid {
     _init() {
