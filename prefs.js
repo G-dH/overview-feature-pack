@@ -312,7 +312,7 @@ function _getAppGridOptionList() {
     optionList.push(
         itemFactory.getRowWidget(
             _('Order By'),
-            _('Choose an order of the app grid icons. The "Custom" option allows you to manually change the order of icons and create folders. Options "Alphabet" and "Usage" do not allow you to manage folders and ignore existing ones.'),
+            _('Choose the order of the app grid icons. The "Custom (Default)" option is default GNOME Shell\'s behavior that allows you to manually change the order of icons and create folders. Options "Alphabet" and "Usage" do not allow you to manage folders and ignore existing ones.'),
             itemFactory.newComboBox(),
             //itemFactory.newDropDown(),
             'appGridOrder',
@@ -356,8 +356,8 @@ function _getAppGridOptionList() {
 
     optionList.push(
         itemFactory.getRowWidget(
-            _('App Names Style'),
-            _('Choose how and when app names should be shown.'),
+            _('App Names Behavior'),
+            _('Choose how and when to display app names.'),
             itemFactory.newComboBox(),
             //itemFactory.newDropDown(),
             'appGridNamesMode',
@@ -367,6 +367,22 @@ function _getAppGridOptionList() {
             ]
         )
     );
+
+    const fontSizeAdjustment = new Gtk.Adjustment({
+        upper: 150,
+        lower: 70,
+        step_increment: 1,
+        page_increment: 1,
+    });
+
+    const fontSizeScale = itemFactory.newScale(fontSizeAdjustment);
+    fontSizeScale.add_mark(100, Gtk.PositionType.TOP, null);
+    optionList.push(itemFactory.getRowWidget(
+        _('App Names Font Size (%)'),
+        _('Adjusts app names font size in percentage of the default size.'),
+        fontSizeScale,
+        'appGridFontSize'
+    ));
 
     optionList.push(
         itemFactory.getRowWidget(
@@ -447,9 +463,41 @@ function _getAppGridOptionList() {
         'appGridRows'
     ));
 
+    const folderColumnsAdjustment = new Gtk.Adjustment({
+        upper: 8,
+        lower: 2,
+        step_increment: 1,
+        page_increment: 1,
+    });
+
+    const folderColumnsSpinBtn = itemFactory.newSpinButton(folderColumnsAdjustment);
+    optionList.push(itemFactory.getRowWidget(
+        _('Folder Columns per Page'),
+        _('Number of columns in folder grid.'),
+        folderColumnsSpinBtn,
+        'appGridFolderColumns'
+    ));
+
+    const folderRowsAdjustment = new Gtk.Adjustment({
+        upper: 8,
+        lower: 2,
+        step_increment: 1,
+        page_increment: 1,
+    });
+
+    const folderRowsSpinBtn = itemFactory.newSpinButton(folderRowsAdjustment);
+    optionList.push(itemFactory.getRowWidget(
+        _('Folder Rows per Page'),
+        _('Number of rows in folder grid.'),
+        folderRowsSpinBtn,
+        'appGridFolderRows'
+    ));
+
     const _setOptionsSensitivity = () => {
         columnsSpinBtn.sensitive = customGridSwitch.active;
         rowsSpinBtn.sensitive = customGridSwitch.active;
+        folderColumnsSpinBtn.sensitive = customGridSwitch.active;
+        folderRowsSpinBtn.sensitive = customGridSwitch.active;
     };
     _setOptionsSensitivity();
     customGridSwitch.connect('notify::active', () => {

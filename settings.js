@@ -56,11 +56,14 @@ var Options = class Options {
             appGridIncludeDash: ['boolean', 'app-grid-fav-run'],
             appGridColumns: ['int', 'app-grid-columns'],
             appGridRows: ['int', 'app-grid-rows'],
+            appGridFolderColumns: ['int', 'app-grid-folder-columns'],
+            appGridFolderRows: ['int', 'app-grid-folder-rows'],
             appGridIconSize: ['int', 'app-grid-icon-size'],
             appGridFolderIconSize: ['int', 'app-grid-folder-icon-size'],
             appGridNamesMode: ['int', 'app-grid-names-mode'],
             appGridIncompletePages: ['boolean', 'app-grid-incomplete-pages'],
             appGridAllowCustom: ['boolean', 'app-grid-allow-custom'],
+            appGridFontSize: ['int', 'app-grid-font-size'],
         }
         this.cachedOptions = {};
     }
