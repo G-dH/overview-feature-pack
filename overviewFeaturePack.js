@@ -1307,7 +1307,12 @@ const IconGridOverrides = {
 
 const FolderViewOverrides = {
     _createGrid: function() {
-        const grid = new FolderGrid();
+        let grid;
+        if (shellVersion < 43) {
+            grid = new FolderGrid();
+        } else {
+            grid = new FolderGrid43();
+        }
         return grid;
     }
 }
@@ -1335,6 +1340,40 @@ class FolderGrid extends IconGrid.IconGrid {
         this.layout_manager.adaptToSize(width, height);
     }
 });
+
+
+// only the first access to the const AppDisplay.AppGrid throws an error, so touch it before it's really needed
+let FolderGrid43;
+AppDisplay.AppGrid;
+if (AppDisplay.AppGrid) {
+    FolderGrid43 = GObject.registerClass(
+    class FolderGrid43 extends AppDisplay.AppGrid {
+        _init() {
+            super._init({
+                allow_incomplete_pages: false,
+                columns_per_page: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_COLUMNS : 3,
+                rows_per_page: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_ROWS : 3,
+                page_halign: Clutter.ActorAlign.CENTER,
+                page_valign: Clutter.ActorAlign.CENTER,
+            });
+
+            APP_GRID_ALLOW_CUSTOM && this.set_style('column-spacing: 10px; row-spacing: 10px;');
+            this.layout_manager.fixedIconSize = APP_GRID_FOLDER_ICON_SIZE;
+
+            this.setGridModes([
+                {
+                    rows: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_COLUMNS : 3,
+                    columns: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_ROWS : 3,
+                },
+            ]);
+        }
+
+        adaptToSize(width, height) {
+            this.layout_manager.adaptToSize(width, height);
+        }
+    });
+
+}
 
 // ------------------ AppDisplay.AppIcon - injection --------------------------------------------------------------
 
