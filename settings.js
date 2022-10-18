@@ -29,7 +29,7 @@ var Options = class Options {
         this._connectionIds = [];
         this.options = {
             dashShiftClickMovesAppToCurrentWs: ['boolean', 'dash-shift-click-moves-app-to-current-ws'],
-            dashHoverIconHighlitsWindows: ['int', 'dash-hover-icon-highlights-wins'],
+            dashHoverIconHighlightsWindows: ['int', 'dash-hover-icon-highlights-wins'],
             dashShowWindowsBeforeActivation: ['boolean', 'dash-show-windows-before-activation'],
             dashClickFollowsRecentWindow: ['boolean', 'dash-click-follows-recent-window'],
             dashScrollSwitchesAppWindowsWs: ['boolean', 'dash-scroll-switches-app-windows-ws'],

@@ -159,7 +159,7 @@ function _updateSettings(settings, key) {
 
     DASH_SCROLL_SWITCH_APP_WS = gOptions.get('dashScrollSwitchesAppWindowsWs', true);
 
-    DASH_HOVER_HIGHLIGHT_WINS = gOptions.get('dashHoverIconHighlitsWindows', true);
+    DASH_HOVER_HIGHLIGHT_WINS = gOptions.get('dashHoverIconHighlightsWindows', true);
 
     FULLSCREEN_HOT_CORNER = gOptions.get('fullscreenHotCorner', true);
 

@@ -167,7 +167,7 @@ function _getGeneralOptionList() {
     optionList.push(
         itemFactory.getRowWidget(
             _('Show Wallpaper in Workspace Switcher Thumbnails'),
-            _('Each workspace switcher thumbnail backround will show the current wallpaper (if not covered by windows).'),
+            _('Each workspace switcher thumbnail background will show the current wallpaper (if not covered by windows).'),
             itemFactory.newSwitch(),
             'showWsSwitcherBg'
         )
@@ -217,7 +217,7 @@ function _getDashOptionList() {
             _('Hovering Over Icon Highlights App Windows'),
             _('When hovering mouse pointer over an app icon, overview will switch to the workspace with app window(s) (if needed), all app window previews will show their titles (enable option "Move Titles Into Windows" to see them all), the most recently used window will be marked by the close button and optionally the opacity of all other windows will be reduced. If option "Prefer Most Recently Used Window" is enabled, workspace will be switched to the one with the most recently used window of the app, even if there is another app window on the current workspace.'),
             itemFactory.newComboBox(),
-            'dashHoverIconHighlitsWindows',
+            'dashHoverIconHighligtsWindows',
             [   [_('Disable'), 0],
                 [_('Window Titles'), 1],
                 [_('Titles + Opacity'), 2],
@@ -341,7 +341,7 @@ function _getAppGridOptionList() {
     optionList.push(
         itemFactory.getRowWidget(
             _('Allow Incomplete Pages'),
-            _('If disabled, icons from the next page (if any) are automatically moved to fill any empty slot left after an icon was (re)moved (to a folder for exapmle).'),
+            _('If disabled, icons from the next page (if any) are automatically moved to fill any empty slot left after an icon was (re)moved (to a folder for example).'),
             itemFactory.newSwitch(),
             //itemFactory.newDropDown(),
             'appGridIncompletePages'
@@ -362,7 +362,7 @@ function _getAppGridOptionList() {
             //itemFactory.newDropDown(),
             'appGridNamesMode',
             [   [_('Ellipsized - Expand Selected (Default)'), 0],
-                [_('Allways Expanded'), 1],
+                [_('Always Expanded'), 1],
                 [_('Hidden - Show Selected Only'), 2],
             ]
         )
@@ -513,7 +513,7 @@ function _getAppGridOptionList() {
 
     optionList.push(itemFactory.getRowWidget(
         _('Reset App Grid Layout'),
-        _('Removes all stored app grid icons positions, after the reset icons will be orderd alphabetically.'),
+        _('Removes all stored app grid icons positions, after the reset icons will be ordered alphabetically.'),
         itemFactory.newResetButton(() => {
             const settings = ExtensionUtils.getSettings('org.gnome.shell');
             settings.set_value('app-picker-layout', new GLib.Variant('aa{sv}', []));
@@ -597,7 +597,7 @@ function _getSearchOptionList() {
     optionList.push(
         itemFactory.getRowWidget(
             _('Shift Moves Window to Current Workspace'),
-            _('Hold down the Shift key while activating the selected search result to move the window to the curent workspace.'),
+            _('Hold down the Shift key while activating the selected search result to move the window to the current workspace.'),
             wspShiftSwitch,
             'searchWindowsShiftMoves'
         )
@@ -665,7 +665,7 @@ function _getAboutOptionList() {
     ));
 
     optionList.push(itemFactory.getRowWidget(
-        _('Gome Extensions'),
+        _('Gnome Extensions'),
         _('Rate and comment the extension on GNOME Extensions site.'),
         itemFactory.newLinkButton('https://extensions.gnome.org/extension/5192'),
     ));

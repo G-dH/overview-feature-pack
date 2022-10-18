@@ -2,11 +2,11 @@
 
 A GNOME Shell extension that adds useful features to the Activities Overview. See screenshots with preferences window below.
 
-Supported versions of GNOME Shell: 41, 42.
+Supported versions of GNOME Shell: 41, 42, 43.
 
 
 ## Install from GitHub repository
-The most recent version in the repository is the one I'm currently running on my own systems, problems may occure, but usually nothing serious.
+The most recent version in the repository is the one I'm currently running on my own systems, problems may occur, but usually nothing serious.
 Run following commands in the terminal (`git` needs to be installed, navigate to the directory you want to download the source):
 
     git clone https://github.com/G-dH/overview-feature-pack.git
