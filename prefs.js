@@ -217,7 +217,7 @@ function _getDashOptionList() {
             _('Hovering Over Icon Highlights App Windows'),
             _('When hovering mouse pointer over an app icon, overview will switch to the workspace with app window(s) (if needed), all app window previews will show their titles (enable option "Move Titles Into Windows" to see them all), the most recently used window will be marked by the close button and optionally the opacity of all other windows will be reduced. If option "Prefer Most Recently Used Window" is enabled, workspace will be switched to the one with the most recently used window of the app, even if there is another app window on the current workspace.'),
             itemFactory.newComboBox(),
-            'dashHoverIconHighligtsWindows',
+            'dashHoverIconHighlightsWindows',
             [   [_('Disable'), 0],
                 [_('Window Titles'), 1],
                 [_('Titles + Opacity'), 2],
