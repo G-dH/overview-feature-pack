@@ -126,8 +126,6 @@ function reset() {
     _updateWindowSearchProvider(reset);
     _moveDashShowAppsIconLeft(reset);
     _updateDash(reset);
-    _updateAppGrid(reset);
-    _updateWindowSearchProvider(reset);
 
     _featurePackOverrides = {};
 
@@ -493,11 +491,11 @@ const WindowPreviewOverride = {
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
-        /*const ongoingTransition = this._title.get_transition('opacity');
+        const ongoingTransition = this._title.get_transition('opacity');
         if (animate &&
             ongoingTransition &&
             ongoingTransition.get_interval().peek_final_value() === 255)
-            return;*/
+            return;
 
         const toShow = this._windowCanClose()
             ? [this._closeButton]
@@ -546,11 +544,11 @@ const WindowPreviewOverride = {
 
         // If we're supposed to animate and an animation in our direction
         // is already happening, let that one continue
-        /*const ongoingTransition = this._title.get_transition('opacity');
+        const ongoingTransition = this._title.get_transition('opacity');
         if (animate &&
             ongoingTransition &&
             ongoingTransition.get_interval().peek_final_value() === 0)
-            return;*/
+            return;
 
         const toHide = [this._closeButton];
 
@@ -732,11 +730,7 @@ function _updateAppGrid(reset = false) {
             // loadApps(), ensureDefaultFolders()
             _featurePackOverrides['AppDisplay'] = _Util.overrideProto(AppDisplay.AppDisplay.prototype, AppDisplayOverride);
         }
-        if (!_featurePackOverrides['FolderGrid']) {
-            _featurePackOverrides['FolderGrid'] = AppDisplay.FolderGrid;
-            AppDisplay.FolderGrid = FolderGrid;
-        }
-        if (APP_GRID_FOLDER_ICON_SIZE > -1 || APP_GRID_ALLOW_CUSTOM) {
+        if (/*shellVersion < 43 && */(APP_GRID_FOLDER_ICON_SIZE > -1 || APP_GRID_ALLOW_CUSTOM)) {
             // fixed icon size for folder icons
             _featurePackOverrides['FolderView'] = _Util.overrideProto(AppDisplay.FolderView.prototype, FolderViewOverrides);
         }
@@ -1044,7 +1038,9 @@ const AppIconOverride = {
 
         if (this.app.get_n_windows()) {
             if (APP_MENU_FORCE_QUIT) {
-                popupItems.push([_('Force Quit'), () => this.app.get_windows()[0].kill()]);
+                popupItems.push([_('Force Quit'), () => {
+                    this.app.get_windows()[0].kill();
+                }]);
             }
 
             if (APP_MENU_CLOSE_WS) {
@@ -1362,8 +1358,8 @@ if (AppDisplay.AppGrid) {
 
             this.setGridModes([
                 {
-                    rows: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_COLUMNS : 3,
-                    columns: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_ROWS : 3,
+                    rows: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_ROWS : 3,
+                    columns: APP_GRID_ALLOW_CUSTOM ? APP_GRID_FOLDER_COLUMNS : 3,
                 },
             ]);
         }
