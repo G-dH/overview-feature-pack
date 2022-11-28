@@ -17,6 +17,8 @@ const Me = ExtensionUtils.getCurrentExtension();
 const Settings = Me.imports.settings;
 const _ = Me.imports.settings._;
 
+const shellVersion = Settings.shellVersion;
+
 const ModifierType = imports.gi.Clutter.ModifierType;
 
 let gOptions;
@@ -195,7 +197,7 @@ let WindowSearchProvider = class WindowSearchProvider {
 
         const candidates = this.windows;
         const _terms = [].concat(terms);
-        let match = null;
+        let match;
 
         const term = _terms.join(' ');
         match = (s) => {
@@ -225,9 +227,13 @@ let WindowSearchProvider = class WindowSearchProvider {
         return this.resultIds;
     }
 
-    getResultMetas (resultIds, callback) {
+    getResultMetas (resultIds, callback = null) {
         const metas = resultIds.map((id) => this.getResultMeta(id));
-        callback(metas);
+        if (shellVersion >= 43) {
+            return new Promise(resolve => resolve(metas));
+        } else {
+            callback(metas);
+        }
     }
 
     getResultMeta (resultId) {
@@ -309,13 +315,21 @@ let WindowSearchProvider = class WindowSearchProvider {
         Main.activateWindow(selectedWin);
     }
 
-    getInitialResultSet (terms, callback, cancellable) {
+    getInitialResultSet (terms, callback, cancellable = null) {
+        if (shellVersion >=43) {
+            cancellable = callback;
+        }
         let windows;
         this.windows = windows = {};
         global.display.get_tab_list(Meta.TabList.NORMAL, null).map(
             (v, i) => windows[`${i}-${v.get_id()}`] = makeResult(v, `${i}-${v.get_id()}`)
         );
-        callback(this._getResultSet(terms));
+
+        if (shellVersion >= 43) {
+            return new Promise(resolve => resolve(this._getResultSet(terms)));
+        } else {
+            callback(this._getResultSet(terms));
+        }
     }
 
     filterResults (results, maxResults) {
