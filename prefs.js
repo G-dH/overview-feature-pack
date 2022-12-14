@@ -665,7 +665,13 @@ function _getAboutOptionList() {
     ));
 
     optionList.push(itemFactory.getRowWidget(
-        _('Gnome Extensions'),
+        _('Changelog'),
+        _("See what's changed."),
+        itemFactory.newLinkButton('https://github.com/G-dH/overview-feature-pack/blob/main/CHANGELOG.md'),
+    ));
+
+    optionList.push(itemFactory.getRowWidget(
+        _('GNOME Extensions'),
         _('Rate and comment the extension on GNOME Extensions site.'),
         itemFactory.newLinkButton('https://extensions.gnome.org/extension/5192'),
     ));
