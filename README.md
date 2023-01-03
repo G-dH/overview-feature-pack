@@ -4,8 +4,14 @@ A GNOME Shell extension that adds useful features to the Activities Overview. Se
 
 Supported versions of GNOME Shell: 41, 42, 43.
 
+[<img alt="" height="100" src="https://raw.githubusercontent.com/andyholmes/gnome-shell-extensions-badge/master/get-it-on-ego.svg?sanitize=true">](https://extensions.gnome.org/extension/5192/ofp-overview-feature-pack/)
 
-## Install from GitHub repository
+## Installation
+
+### Installation from extensions.gnome.org
+The easiest way to install OFP extension: go to [extensions.gnome.org](https://extensions.gnome.org/extension/5192/ofp-overview-feature-pack/) and toggle the switch. This installation also gives you automatic updates in the future.
+
+### Installation from GitHub repository
 The most recent version in the repository is the one I'm currently running on my own systems, problems may occur, but usually nothing serious.
 Run following commands in the terminal (`git` needs to be installed, navigate to the directory you want to download the source):
 
@@ -29,13 +35,3 @@ After installation you need to enable the extension and access its settings.
 ## Buy me a coffee
 If you like my extensions and want to keep me motivated, you can also buy me a coffee:
 [buymeacoffee.com/georgdh](https://buymeacoffee.com/georgdh)
-
-## Changelog
-
-### v2 (not yet released)
-
-**Added:**
-- App Grid sorting and content options
-- Option to always show full app names in the App Grid
-- Highlight app windows on Dash icon hover now switches workspace automaticaly and adds options to highlight windows by showing their titles or this plus decreasing other windows opacity.
-- Option to show workspace *index / index + workspace name / index + current app name* when mouse pointer hovers over a workspace thumbnail in the overview.
